@@ -1,6 +1,4 @@
-
-
-import { FormData, Tab, DetailedBudget, Member, Task, TaskStatus, WorkType, Activity, Report } from './types';
+import { FormData, Tab, DetailedBudget, Member, Task, TaskStatus, WorkType, Activity, Report, TaskType, ProjectStatus, BudgetItemStatus, TaskSortOption, TaskStatusFilter, ActivitySortOption, ActivityStatusFilter, DateRangeFilter } from './types';
 
 export const TABS: Tab[] = [
   { id: 'projectInfo', label: 'Project Information' },
@@ -29,6 +27,7 @@ export const initialBudget: DetailedBudget = {
 export const initialFormData: FormData = {
   id: '',
   projectTitle: '',
+  status: 'Active',
   artisticDisciplines: [],
   craftGenres: [],
   danceGenres: [],
@@ -72,6 +71,7 @@ export const initialMemberData: Member = {
 
 export const initialTaskData: Task = {
     id: '',
+    taskCode: '',
     projectId: '',
     title: '',
     description: '',
@@ -79,6 +79,8 @@ export const initialTaskData: Task = {
     status: 'To Do',
     startDate: '',
     dueDate: '',
+    taskType: 'Time-Based',
+    isComplete: false,
     estimatedHours: 0,
     actualHours: 0,
     budgetItemId: '',
@@ -94,6 +96,8 @@ export const initialActivityData: Activity = {
     description: '',
     startDate: '',
     endDate: '',
+    startTime: '',
+    endTime: '',
     hours: 0,
     status: 'Pending',
     createdAt: '',
@@ -122,10 +126,42 @@ export const TASK_STATUSES: { value: TaskStatus, label: string }[] = [
     { value: 'Done', label: 'Done' },
 ];
 
+export const TASK_SORT_OPTIONS: { value: TaskSortOption, label: string }[] = [
+    { value: 'updatedAt', label: 'Last Updated' },
+    { value: 'dueDate', label: 'Due Date' },
+    { value: 'assignee', label: 'Assignee' },
+];
+
+export const TASK_STATUS_FILTER_OPTIONS: { value: TaskStatusFilter, label: string }[] = [
+    { value: 'all', label: 'All Tasks' },
+    { value: 'overdue', label: 'Overdue' },
+    { value: 'dueThisWeek', label: 'Due This Week' },
+    { value: 'todo', label: 'To Do' },
+    { value: 'inProgress', label: 'In Progress' },
+    { value: 'done', label: 'Done' },
+];
+
+export const ACTIVITY_SORT_OPTIONS: { value: ActivitySortOption, label: string }[] = [
+    { value: 'date-desc', label: 'Activity Date (Newest)' },
+    { value: 'date-asc', label: 'Activity Date (Oldest)' },
+    { value: 'updatedAt', label: 'Last Updated' },
+];
+
+export const ACTIVITY_STATUS_FILTER_OPTIONS: { value: ActivityStatusFilter, label: string }[] = [
+    { value: 'all', label: 'All Statuses' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'approved', label: 'Approved' },
+];
+
 export const WORK_TYPES: { value: WorkType, label: string }[] = [
     { value: 'Paid', label: 'Paid' },
     { value: 'In-Kind', label: 'In-Kind' },
     { value: 'Volunteer', label: 'Volunteer' },
+];
+
+export const TASK_TYPES: { value: TaskType, label: string }[] = [
+    { value: 'Time-Based', label: 'Time-Based (Logs hours)' },
+    { value: 'Milestone', label: 'Milestone (Checklist item)' },
 ];
 
 
@@ -358,4 +394,23 @@ export const ACTIVITY_TYPES = [
     { value: 'Select', label: 'Select' },
     { value: 'public-presentation', label: 'Public presentation' },
     { value: 'publication', label: 'Publication' },
+];
+
+export const PROJECT_STATUS_OPTIONS: { value: ProjectStatus, label: string }[] = [
+    { value: 'Active', label: 'Set as Active' },
+    { value: 'On Hold', label: 'Set as On Hold' },
+    { value: 'Completed', label: 'Mark as Completed' },
+];
+
+export const DATE_RANGE_FILTER_OPTIONS: { value: DateRangeFilter, label: string }[] = [
+    { value: 'all', label: 'All Time' },
+    { value: 'last7days', label: 'Last 7 Days' },
+    { value: 'last30days', label: 'Last 30 Days' },
+    { value: 'thisMonth', label: 'This Month' },
+];
+
+export const BUDGET_ITEM_STATUS_OPTIONS: { value: BudgetItemStatus, label: string }[] = [
+    { value: 'Pending', label: 'Pending' },
+    { value: 'Approved', label: 'Approved' },
+    { value: 'Denied', label: 'Denied' },
 ];

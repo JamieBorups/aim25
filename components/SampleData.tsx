@@ -1,7 +1,7 @@
-
-
 import React, { useState } from 'react';
-import { FormData, Member, Task, BudgetItem, DetailedBudget, Activity, Report } from '../types';
+import { FormData, Member, Task, BudgetItem, Report, DirectExpense, BudgetItemStatus } from '../types';
+import { useAppContext } from '../context/AppContext';
+import ConfirmationModal from './ui/ConfirmationModal';
 
 const newId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
@@ -12,6 +12,12 @@ const getBudgetItemId = (project: FormData, category: keyof FormData['budget']['
         return '';
     }
     return item.id;
+};
+
+const dateDaysAgo = (days: number): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toISOString();
 };
 
 // --- SAMPLE DATA DEFINITIONS ---
@@ -51,6 +57,7 @@ const createSampleProjects = (members: Member[]) => {
     let p1 = {
         id: newId('proj'),
         projectTitle: 'Community Mural Project',
+        status: 'Active',
         artisticDisciplines: ['visual', 'multi-disciplinary'],
         visualArtsGenres: ['painting', 'mixed-media'],
         projectStartDate: '2024-09-01',
@@ -70,17 +77,17 @@ const createSampleProjects = (members: Member[]) => {
         budget: {
             revenues: {
                 grants: [
-                    { id: newId('b'), source: 'mac', description: 'Application for this grant', amount: 8000 },
-                    { id: newId('b'), source: 'municipalWinnipeg', description: 'City Arts Grant', amount: 2000 },
+                    { id: newId('b'), source: 'mac', description: 'Application for this grant', amount: 8000, status: 'Pending' as BudgetItemStatus },
+                    { id: newId('b'), source: 'municipalWinnipeg', description: 'City Arts Grant', amount: 2000, status: 'Approved' as BudgetItemStatus, actualAmount: 2000 },
                 ],
                 contributions: [
-                    { id: newId('b'), source: 'inKindPartners', description: 'Community Center wall space', amount: 2500 },
-                    { id: newId('b'), source: 'financialPartners', description: 'Local business sponsorship', amount: 1500 },
+                    { id: newId('b'), source: 'inKindPartners', description: 'Community Center wall space', amount: 2500, status: 'Approved' as BudgetItemStatus },
+                    { id: newId('b'), source: 'financialPartners', description: 'Local business sponsorship', amount: 1500, status: 'Approved' as BudgetItemStatus, actualAmount: 1500 },
                 ],
                 tickets: { numVenues: 0, percentCapacity: 0, venueCapacity: 0, avgTicketPrice: 0, description: '' },
                 sales: [],
                 fundraising: [
-                    { id: newId('b'), source: 'donations', description: 'Online donation campaign', amount: 1000 },
+                    { id: newId('b'), source: 'donations', description: 'Online donation campaign', amount: 1000, status: 'Pending' as BudgetItemStatus },
                 ],
             },
             expenses: {
@@ -111,6 +118,7 @@ const createSampleProjects = (members: Member[]) => {
     let p2 = {
         id: newId('proj'),
         projectTitle: 'Summer Folk Fusion Festival',
+        status: 'Active',
         artisticDisciplines: ['music'],
         musicGenres: ['contemporary-folk', 'world-music', 'instrumental'],
         projectStartDate: '2025-06-15',
@@ -129,9 +137,9 @@ const createSampleProjects = (members: Member[]) => {
         budget: {
             revenues: {
                 tickets: { numVenues: 1, percentCapacity: 80, venueCapacity: 500, avgTicketPrice: 25, description: 'General Admission' },
-                fundraising: [ { id: newId('b'), source: 'sponsorship', description: 'Local business sponsor', amount: 3000 } ],
-                grants: [ { id: newId('b'), source: 'provincialOther', description: 'Provincial Tourism Grant', amount: 2000 } ],
-                sales: [ { id: newId('b'), source: 'merchandise', description: 'T-shirts and artist merch', amount: 1000 } ],
+                fundraising: [ { id: newId('b'), source: 'sponsorship', description: 'Local business sponsor', amount: 3000, status: 'Approved' as BudgetItemStatus, actualAmount: 3000 } ],
+                grants: [ { id: newId('b'), source: 'provincialOther', description: 'Provincial Tourism Grant', amount: 2000, status: 'Pending' as BudgetItemStatus } ],
+                sales: [ { id: newId('b'), source: 'merchandise', description: 'T-shirts and artist merch', amount: 1000, status: 'Pending' as BudgetItemStatus } ],
                 contributions: [],
             },
             expenses: {
@@ -165,6 +173,7 @@ const createSampleProjects = (members: Member[]) => {
     let p3 = {
         id: newId('proj'),
         projectTitle: 'The Digital Storytelling Workshop',
+        status: 'Completed',
         artisticDisciplines: ['literary', 'media'],
         literaryGenres: ['storytelling', 'creative-non-fiction'],
         mediaGenres: ['audio-art', 'video-art'],
@@ -184,11 +193,11 @@ const createSampleProjects = (members: Member[]) => {
         budget: {
             revenues: {
                 grants: [
-                    { id: newId('b'), source: 'federalCanada', description: 'Digital arts grant', amount: 4000 },
-                    { id: newId('b'), source: 'provincialOther', description: 'Arts Education Grant', amount: 3000 },
+                    { id: newId('b'), source: 'federalCanada', description: 'Digital arts grant', amount: 4000, status: 'Approved' as BudgetItemStatus, actualAmount: 4000 },
+                    { id: newId('b'), source: 'provincialOther', description: 'Arts Education Grant', amount: 3000, status: 'Denied' as BudgetItemStatus },
                 ],
                 contributions: [
-                    { id: newId('b'), source: 'financialApplicant', description: 'Participant fees', amount: 1500 }
+                    { id: newId('b'), source: 'financialApplicant', description: 'Participant fees', amount: 1500, status: 'Approved' as BudgetItemStatus, actualAmount: 1500 }
                 ],
                 tickets: { numVenues: 0, percentCapacity: 0, venueCapacity: 0, avgTicketPrice: 0, description: '' },
                 sales: [],
@@ -236,28 +245,27 @@ const createSampleProjects = (members: Member[]) => {
 const createSampleTasks = (projects: FormData[], members: Member[]): Task[] => {
     const [p1, p2, p3] = projects;
     const [jane, john, emily, michael] = members;
-    const now = new Date();
 
     return [
         // Project 1 Tasks
-        { id: newId('task'), projectId: p1.id, title: 'Design Mural Concept', description: 'Develop 3 initial concepts for community review.', assignedMemberId: jane.id, status: 'Done', startDate: '2024-09-02', dueDate: '2024-09-15', estimatedHours: 40, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: new Date(now.setDate(now.getDate() - 20)).toISOString() },
-        { id: newId('task'), projectId: p1.id, title: 'Community Feedback Session', description: 'Host a session to get feedback on concepts.', assignedMemberId: emily.id, status: 'Done', startDate: '2024-09-16', dueDate: '2024-09-20', estimatedHours: 8, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'designers'), workType: 'Paid', hourlyRate: 40, updatedAt: new Date(now.setDate(now.getDate() - 18)).toISOString() },
-        { id: newId('task'), projectId: p1.id, title: 'Purchase Mural Supplies', description: 'Order all paints, primers, and brushes.', assignedMemberId: john.id, status: 'In Progress', startDate: '2024-09-21', dueDate: '2024-10-01', estimatedHours: 10, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'production', 'materials'), workType: 'In-Kind', hourlyRate: 0, updatedAt: new Date(now.setDate(now.getDate() - 5)).toISOString() },
-        { id: newId('task'), projectId: p1.id, title: 'Paint Mural - Phase 1', description: 'Prime and outline the mural.', assignedMemberId: jane.id, status: 'To Do', startDate: '2024-10-02', dueDate: '2024-10-15', estimatedHours: 60, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: new Date(now.setDate(now.getDate() - 2)).toISOString() },
+        { id: newId('task'), taskCode: 'CMP-01', projectId: p1.id, title: 'Design Mural Concept', description: 'Develop 3 initial concepts for community review.', assignedMemberId: jane.id, status: 'Done', startDate: '2024-09-02', dueDate: '2024-09-15', taskType: 'Time-Based', isComplete: true, estimatedHours: 40, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: dateDaysAgo(20) },
+        { id: newId('task'), taskCode: 'CMP-02', projectId: p1.id, title: 'Community Feedback Session', description: 'Host a session to get feedback on concepts.', assignedMemberId: emily.id, status: 'Done', startDate: '2024-09-16', dueDate: '2024-09-20', taskType: 'Time-Based', isComplete: true, estimatedHours: 8, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'designers'), workType: 'Paid', hourlyRate: 40, updatedAt: dateDaysAgo(18) },
+        { id: newId('task'), taskCode: 'CMP-03', projectId: p1.id, title: 'Purchase Mural Supplies', description: 'Order all paints, primers, and brushes.', assignedMemberId: john.id, status: 'In Progress', startDate: '2024-09-21', dueDate: '2024-10-01', taskType: 'Time-Based', isComplete: false, estimatedHours: 10, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'production', 'materials'), workType: 'In-Kind', hourlyRate: 0, updatedAt: dateDaysAgo(5) },
+        { id: newId('task'), taskCode: 'CMP-04', projectId: p1.id, title: 'Paint Mural - Phase 1', description: 'Prime and outline the mural.', assignedMemberId: jane.id, status: 'To Do', startDate: '2024-10-02', dueDate: '2024-10-15', taskType: 'Time-Based', isComplete: false, estimatedHours: 60, actualHours: 0, budgetItemId: getBudgetItemId(p1, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: dateDaysAgo(2) },
 
         // Project 2 Tasks
-        { id: newId('task'), projectId: p2.id, title: 'Book Festival Venue', description: 'Finalize contract with the park.', assignedMemberId: john.id, status: 'Done', startDate: '2025-01-15', dueDate: '2025-02-01', estimatedHours: 15, actualHours: 0, budgetItemId: getBudgetItemId(p2, 'production', 'rentals'), workType: 'Paid', hourlyRate: 60, updatedAt: new Date(now.setDate(now.getDate() - 30)).toISOString() },
-        { id: newId('task'), projectId: p2.id, title: 'Compose Opening Number', description: 'Write and arrange the festival’s opening piece.', assignedMemberId: michael.id, status: 'In Progress', startDate: '2025-02-02', dueDate: '2025-05-01', estimatedHours: 80, actualHours: 0, budgetItemId: getBudgetItemId(p2, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: new Date(now.setDate(now.getDate() - 10)).toISOString() },
-        { id: newId('task'), projectId: p2.id, title: 'Hire Sound Engineer', description: 'Find and contract a live sound engineer.', assignedMemberId: john.id, status: 'To Do', startDate: '2025-04-01', dueDate: '2025-04-15', estimatedHours: 10, actualHours: 0, budgetItemId: getBudgetItemId(p2, 'professionalFees', 'consultant'), workType: 'Paid', hourlyRate: 60, updatedAt: new Date(now.setDate(now.getDate() - 1)).toISOString() },
+        { id: newId('task'), taskCode: 'SFFF-01', projectId: p2.id, title: 'Book Festival Venue', description: 'Finalize contract with the park.', assignedMemberId: john.id, status: 'Done', startDate: '2025-01-15', dueDate: '2025-02-01', taskType: 'Milestone', isComplete: true, estimatedHours: 0, actualHours: 0, budgetItemId: '', workType: 'Paid', hourlyRate: 0, updatedAt: dateDaysAgo(30) },
+        { id: newId('task'), taskCode: 'SFFF-02', projectId: p2.id, title: 'Compose Opening Number', description: 'Write and arrange the festival’s opening piece.', assignedMemberId: michael.id, status: 'In Progress', startDate: '2025-02-02', dueDate: '2025-05-01', taskType: 'Time-Based', isComplete: false, estimatedHours: 80, actualHours: 0, budgetItemId: getBudgetItemId(p2, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 50, updatedAt: dateDaysAgo(10) },
+        { id: newId('task'), taskCode: 'SFFF-03', projectId: p2.id, title: 'Hire Sound Engineer', description: 'Find and contract a live sound engineer.', assignedMemberId: john.id, status: 'To Do', startDate: '2025-04-01', dueDate: '2025-04-15', taskType: 'Time-Based', isComplete: false, estimatedHours: 10, actualHours: 0, budgetItemId: getBudgetItemId(p2, 'professionalFees', 'consultant'), workType: 'Paid', hourlyRate: 60, updatedAt: dateDaysAgo(1) },
         
         // Project 3 Tasks
-        { id: newId('task'), projectId: p3.id, title: 'Develop Workshop Curriculum', description: 'Outline all 4 weeks, including exercises and examples.', assignedMemberId: jane.id, status: 'In Progress', startDate: '2025-01-02', dueDate: '2025-01-15', estimatedHours: 30, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 55, updatedAt: new Date(now.setDate(now.getDate() - 8)).toISOString() },
-        { id: newId('task'), projectId: p3.id, title: 'Set up Online Platform', description: 'Configure online learning environment and tools.', assignedMemberId: emily.id, status: 'To Do', startDate: '2025-01-16', dueDate: '2025-01-20', estimatedHours: 15, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'consultant'), workType: 'Paid', hourlyRate: 45, updatedAt: new Date(now.setDate(now.getDate() - 4)).toISOString() },
-        { id: newId('task'), projectId: p3.id, title: 'Onboard Participants', description: 'Send welcome emails and instructions.', assignedMemberId: emily.id, status: 'Backlog', startDate: '2025-01-21', dueDate: '2025-01-25', estimatedHours: 5, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'consultant'), workType: 'Volunteer', hourlyRate: 0, updatedAt: new Date(now.setDate(now.getDate() - 20)).toISOString() },
+        { id: newId('task'), taskCode: 'DSW-01', projectId: p3.id, title: 'Develop Workshop Curriculum', description: 'Outline all 4 weeks, including exercises and examples.', assignedMemberId: jane.id, status: 'In Progress', startDate: '2025-01-02', dueDate: '2025-01-15', taskType: 'Time-Based', isComplete: false, estimatedHours: 30, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'artists'), workType: 'Paid', hourlyRate: 55, updatedAt: dateDaysAgo(8) },
+        { id: newId('task'), taskCode: 'DSW-02', projectId: p3.id, title: 'Set up Online Platform', description: 'Configure online learning environment and tools.', assignedMemberId: emily.id, status: 'To Do', startDate: '2025-01-16', dueDate: '2025-01-20', taskType: 'Time-Based', isComplete: false, estimatedHours: 15, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'consultant'), workType: 'Paid', hourlyRate: 45, updatedAt: dateDaysAgo(4) },
+        { id: newId('task'), taskCode: 'DSW-03', projectId: p3.id, title: 'Onboard Participants', description: 'Send welcome emails and instructions.', assignedMemberId: emily.id, status: 'Backlog', startDate: '2025-01-21', dueDate: '2025-01-25', taskType: 'Time-Based', isComplete: false, estimatedHours: 5, actualHours: 0, budgetItemId: getBudgetItemId(p3, 'professionalFees', 'consultant'), workType: 'Volunteer', hourlyRate: 0, updatedAt: dateDaysAgo(20) },
     ];
 };
 
-const createSampleActivities = (tasks: Task[], members: Member[]): Activity[] => {
+const createSampleActivities = (tasks: Task[], members: Member[]) => {
     const [t1, t2, t3, _t4, _t5, t6, _t7, t8] = tasks;
     const [jane, john, emily, michael] = members;
 
@@ -272,8 +280,7 @@ const createSampleActivities = (tasks: Task[], members: Member[]): Activity[] =>
     ];
 
     return activityData.map(data => {
-        const now = new Date();
-        const updateDate = new Date(now.setDate(now.getDate() - data.daysAgo)).toISOString();
+        const updateDate = dateDaysAgo(data.daysAgo);
         return {
             id: newId('act'),
             taskId: data.task.id,
@@ -290,8 +297,9 @@ const createSampleActivities = (tasks: Task[], members: Member[]): Activity[] =>
 };
 
 
-const SampleData: React.FC<{ setProjects: (p: FormData[]) => void; setMembers: (m: Member[]) => void; setTasks: (t: Task[]) => void; setActivities: (a: Activity[]) => void; setReports: (r: Report[]) => void; }> = ({ setProjects, setMembers, setTasks, setActivities, setReports }) => {
-    const [successMessage, setSuccessMessage] = useState('');
+const SampleData: React.FC = () => {
+    const { setProjects, setMembers, setTasks, setActivities, setDirectExpenses, setReports, notify, clearAllData } = useAppContext();
+    const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
     const handleLoadData = () => {
         const newMembers = rawMembers.map(m => ({
@@ -310,13 +318,36 @@ const SampleData: React.FC<{ setProjects: (p: FormData[]) => void; setMembers: (
         setProjects(newProjects);
         setTasks(newTasks);
         setActivities(newActivities);
+        setDirectExpenses([]);
         setReports([]); // Clear old reports
 
-        setSuccessMessage('Sample data loaded successfully! Navigate to Projects or Task Management to see the results.');
+        notify('Sample data loaded successfully!', 'success');
+    };
+
+    const confirmClearData = () => {
+        clearAllData();
+        setIsClearModalOpen(false);
     };
 
     return (
         <div className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
+            {isClearModalOpen && (
+                <ConfirmationModal
+                    isOpen={isClearModalOpen}
+                    onClose={() => setIsClearModalOpen(false)}
+                    onConfirm={confirmClearData}
+                    title="Clear All Application Data"
+                    message={
+                        <>
+                            Are you absolutely sure you want to delete ALL application data? 
+                            This includes all projects, members, tasks, and activities.
+                            <br />
+                            <strong className="font-bold text-red-700">This action cannot be undone.</strong>
+                        </>
+                    }
+                    confirmButtonText="Yes, Delete Everything"
+                />
+            )}
             <div className="text-center">
                 <i className="fa-solid fa-flask-vial text-6xl text-amber-500"></i>
                 <h1 className="mt-4 text-3xl font-bold text-slate-900">Load Sample Data</h1>
@@ -332,22 +363,16 @@ const SampleData: React.FC<{ setProjects: (p: FormData[]) => void; setMembers: (
                     </div>
                 </div>
 
-                {successMessage && (
-                     <div className="mt-6 bg-green-100 border-l-4 border-green-500 text-green-800 p-4 max-w-2xl mx-auto text-left">
-                        <div className="flex">
-                            <div className="py-1"><i className="fa-solid fa-check-circle mr-3"></i></div>
-                            <div>
-                                <p className="font-bold">Success!</p>
-                                <p className="text-sm">{successMessage}</p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                <div className="mt-8">
+                <div className="mt-8 flex items-center justify-center gap-4">
                     <button onClick={handleLoadData} className="px-8 py-3 text-lg font-medium text-white bg-teal-600 border border-transparent rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500">
                         <i className="fa-solid fa-cubes-stacked mr-2"></i>
                         Load Sample Data
+                    </button>
+                    <button 
+                        onClick={() => setIsClearModalOpen(true)}
+                        className="px-8 py-3 text-lg font-medium text-red-700 bg-red-100 border border-red-200 rounded-md shadow-sm hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500">
+                        <i className="fa-solid fa-trash-alt mr-2"></i>
+                        Clear All Data
                     </button>
                 </div>
             </div>

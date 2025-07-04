@@ -1,13 +1,9 @@
-
 import React, { useMemo, useState } from 'react';
 import { Task, FormData, Member, BudgetItem, TaskStatus, Activity } from '../../types';
 import { EXPENSE_FIELDS } from '../../constants';
+import { useAppContext } from '../../context/AppContext';
 
 interface WorkplanViewProps {
-  tasks: Task[];
-  projects: FormData[];
-  members: Member[];
-  activities: Activity[];
   selectedProjectId: string;
 }
 
@@ -52,6 +48,7 @@ const CategorySection: React.FC<{
     
         // `tasks` is the array of tasks for this specific category
         tasks.forEach(task => { 
+            if (task.taskType === 'Milestone') return;
             // Find all approved activities for this specific task
             const relatedActivities = allActivities.filter(a => a.taskId === task.id && a.status === 'Approved');
     
@@ -110,6 +107,7 @@ const CategorySection: React.FC<{
                             const actualHours = getActualHoursForTask(task.id);
                             const approvedActivities = allActivities.filter(a => a.taskId === task.id && a.status === 'Approved');
                             const isExpanded = expandedTasks.has(task.id);
+                            const isMilestone = task.taskType === 'Milestone';
 
                             return (
                                 <React.Fragment key={task.id}>
@@ -118,7 +116,10 @@ const CategorySection: React.FC<{
                                           <div className="flex items-center">
                                               <i className={`fa-solid fa-chevron-right text-xs text-slate-400 mr-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}></i>
                                               <div>
-                                                  <div className="text-sm font-medium text-slate-800">{task.title}</div>
+                                                  <div className="text-sm font-medium text-slate-800 flex items-center gap-2">
+                                                    <span className="font-mono text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{task.taskCode}</span>
+                                                    <span>{task.title}</span>
+                                                  </div>
                                                   <div className="text-xs text-slate-500">{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date'}</div>
                                               </div>
                                           </div>
@@ -126,12 +127,22 @@ const CategorySection: React.FC<{
                                         <td className="py-2.5 px-2 text-sm text-slate-600 whitespace-nowrap">
                                             {member ? `${member.firstName} ${member.lastName}` : 'Unassigned'}
                                         </td>
-                                        <td className="py-2.5 px-2 whitespace-nowrap"><span className={getStatusBadge(task.status)}>{task.status}</span></td>
+                                        <td className="py-2.5 px-2 whitespace-nowrap">
+                                            {isMilestone ? (
+                                                <span className={`px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${task.isComplete ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-800'}`}>
+                                                    {task.isComplete ? 'Milestone Complete' : 'Milestone'}
+                                                </span>
+                                            ) : (
+                                                <span className={getStatusBadge(task.status)}>{task.status}</span>
+                                            )}
+                                        </td>
                                         <td className="py-2.5 pl-2 text-right text-sm text-slate-600 whitespace-nowrap">
-                                            <span title="Actual Hours" className="font-bold">{actualHours}h</span> / <span title="Estimated Hours">{task.estimatedHours}h</span>
+                                            {!isMilestone && (
+                                                <><span title="Actual Hours" className="font-bold">{actualHours}h</span> / <span title="Estimated Hours">{task.estimatedHours}h</span></>
+                                            )}
                                         </td>
                                     </tr>
-                                    {isExpanded && approvedActivities.length > 0 && (
+                                    {isExpanded && !isMilestone && approvedActivities.length > 0 && (
                                         <tr className="bg-slate-50">
                                             <td colSpan={4} className="p-0">
                                                 <div className="px-6 py-3">
@@ -155,7 +166,7 @@ const CategorySection: React.FC<{
                                             </td>
                                         </tr>
                                     )}
-                                    {isExpanded && approvedActivities.length === 0 && (
+                                    {isExpanded && !isMilestone && approvedActivities.length === 0 && (
                                          <tr className="bg-slate-50">
                                             <td colSpan={4} className="px-6 py-4 text-center text-sm text-slate-500 italic">
                                                 No approved time has been logged for this task.
@@ -173,7 +184,8 @@ const CategorySection: React.FC<{
 }
 
 
-const WorkplanView: React.FC<WorkplanViewProps> = ({ tasks, projects, members, activities, selectedProjectId }) => {
+const WorkplanView: React.FC<WorkplanViewProps> = ({ selectedProjectId }) => {
+    const { tasks, projects, members, activities } = useAppContext();
     
     const expenseCategories = Object.entries(EXPENSE_FIELDS).map(([key, fields]) => {
         const title = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
@@ -218,7 +230,7 @@ const WorkplanView: React.FC<WorkplanViewProps> = ({ tasks, projects, members, a
 
                     {expenseCategories.map(category => {
                         const categoryBudgetItemIds = new Set(project.budget.expenses[category.key].map(item => item.id));
-                        const tasksForCategory = projectTasks.filter(task => categoryBudgetItemIds.has(task.budgetItemId));
+                        const tasksForCategory = projectTasks.filter(task => task.taskType === 'Time-Based' && categoryBudgetItemIds.has(task.budgetItemId));
                         const budgetedAmount = sumAmounts(project.budget.expenses[category.key]);
 
                         if(tasksForCategory.length === 0 && budgetedAmount === 0) return null;

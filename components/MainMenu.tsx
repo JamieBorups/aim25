@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Page } from '../types';
 
 interface MainMenuProps {
@@ -9,15 +8,14 @@ interface MainMenuProps {
 
 const NavLink: React.FC<{
     page: Page;
-    icon: string;
     label: string;
     activePage: Page;
     onNavigate: (page: Page) => void;
-}> = ({ page, icon, label, activePage, onNavigate }) => {
+}> = ({ page, label, activePage, onNavigate }) => {
     const isActive = activePage === page;
-    const baseClasses = "group flex items-center px-3 py-2 text-base font-medium rounded-md transition-colors duration-150";
-    const activeClasses = "bg-slate-900 text-white shadow-inner";
-    const inactiveClasses = "text-slate-300 hover:bg-slate-700/50 hover:text-white";
+    const baseClasses = "px-3 py-4 text-sm font-semibold transition-colors duration-150 border-b-2";
+    const activeClasses = "border-teal-400 text-white";
+    const inactiveClasses = "border-transparent text-slate-300 hover:text-white hover:border-slate-500";
 
     return (
         <a
@@ -29,77 +27,107 @@ const NavLink: React.FC<{
             className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}
             aria-current={isActive ? 'page' : undefined}
         >
-            <i className={`${icon} mr-3 h-5 w-5 ${isActive ? 'text-teal-400' : 'text-slate-400 group-hover:text-teal-400'}`} aria-hidden="true"></i>
+            {label}
+        </a>
+    );
+};
+
+const DropdownLink: React.FC<{
+    page: Page;
+    icon: string;
+    label: string;
+    activePage: Page;
+    onNavigate: (page: Page) => void;
+    onClick: () => void;
+}> = ({ page, icon, label, activePage, onNavigate, onClick }) => {
+    const isActive = activePage === page;
+    const baseClasses = "group flex items-center w-full px-4 py-2 text-sm text-left";
+    const activeClasses = "bg-slate-100 text-slate-900";
+    const inactiveClasses = "text-slate-700 hover:bg-slate-100 hover:text-slate-900";
+
+    return (
+        <a
+            href="#"
+            role="menuitem"
+            onClick={(e) => {
+                e.preventDefault();
+                onNavigate(page);
+                onClick();
+            }}
+            className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses}`}
+        >
+             <i className={`${icon} mr-3 h-5 w-5 text-slate-400 group-hover:text-teal-500`} aria-hidden="true"></i>
             {label}
         </a>
     );
 }
 
 const MainMenu: React.FC<MainMenuProps> = ({ activePage, onNavigate }) => {
-    return (
-        <div className="w-64 bg-slate-800 text-white flex-shrink-0 flex flex-col">
-            <div className="h-16 flex items-center justify-center bg-slate-900 shadow-md flex-shrink-0 border-b border-slate-700">
-                <h1 className="text-xl font-bold tracking-wider">The Arts Incubator</h1>
-            </div>
-            <nav className="flex-1 px-3 py-4 space-y-1">
-                <NavLink
-                    page="home"
-                    icon="fa-solid fa-house"
-                    label="Home"
-                    activePage={activePage}
-                    onNavigate={onNavigate}
-                />
-                <NavLink
-                    page="projects"
-                    icon="fa-solid fa-diagram-project"
-                    label="Projects"
-                    activePage={activePage}
-                    onNavigate={onNavigate}
-                />
-                 <NavLink
-                    page="members"
-                    icon="fa-solid fa-users"
-                    label="Members"
-                    activePage={activePage}
-                    onNavigate={onNavigate}
-                />
-                <NavLink
-                    page="tasks"
-                    icon="fa-solid fa-list-check"
-                    label="Task Management"
-                    activePage={activePage}
-                    onNavigate={onNavigate}
-                />
-                <div>
-                    <NavLink
-                        page="reports"
-                        icon="fa-solid fa-chart-pie"
-                        label="Reports"
-                        activePage={activePage}
-                        onNavigate={onNavigate}
-                    />
-                     <div className="pl-6 mt-1">
-                        <NavLink
-                            page="reportsPrototype"
-                            icon="fa-solid fa-flask"
-                            label="Prototype"
-                            activePage={activePage}
-                            onNavigate={onNavigate}
-                        />
-                    </div>
-                </div>
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
-                 <div className="pt-4 mt-4 border-t border-slate-700/50">
-                    <NavLink
-                        page="sampleData"
-                        icon="fa-solid fa-flask-vial"
-                        label="Project Sample Data"
-                        activePage={activePage}
-                        onNavigate={onNavigate}
-                    />
+     useEffect(() => {
+      function handleClickOutside(event: MouseEvent) {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          setIsDropdownOpen(false);
+        }
+      }
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => {
+        document.removeEventListener("mousedown", handleClickOutside);
+      };
+    }, [dropdownRef]);
+
+
+    return (
+        <header className="bg-slate-800 text-white shadow-lg sticky top-0 z-40">
+            <div className="mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center">
+                        <div className="flex-shrink-0">
+                            <h1 className="text-xl font-bold tracking-wider">The Arts Incubator</h1>
+                        </div>
+                        <nav className="hidden md:block">
+                            <div className="ml-10 flex items-baseline space-x-4">
+                               <NavLink page="home" label="Home" activePage={activePage} onNavigate={onNavigate} />
+                               <NavLink page="projects" label="Projects" activePage={activePage} onNavigate={onNavigate} />
+                               <NavLink page="members" label="Members" activePage={activePage} onNavigate={onNavigate} />
+                               <NavLink page="tasks" label="Task Management" activePage={activePage} onNavigate={onNavigate} />
+                               <NavLink page="reports" label="Reports" activePage={activePage} onNavigate={onNavigate} />
+                            </div>
+                        </nav>
+                    </div>
+                    <div className="hidden md:block">
+                        <div className="ml-4 flex items-center md:ml-6">
+                             <div className="relative" ref={dropdownRef}>
+                                <div>
+                                    <button 
+                                        type="button" 
+                                        className="inline-flex justify-center w-full rounded-md border border-slate-600 shadow-sm px-4 py-2 bg-slate-700/50 text-sm font-medium text-slate-300 hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-white" 
+                                        id="options-menu" 
+                                        aria-haspopup="true" 
+                                        aria-expanded="true"
+                                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                                    >
+                                        Tools
+                                        <i className="fa-solid fa-chevron-down -mr-1 ml-2 h-5 w-5" aria-hidden="true"></i>
+                                    </button>
+                                </div>
+                                {isDropdownOpen && (
+                                    <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
+                                        <div className="py-1" role="none">
+                                            <DropdownLink page="sampleData" icon="fa-solid fa-flask-vial" label="Project Sample Data" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
+                                            <DropdownLink page="detailedSampleData" icon="fa-solid fa-database" label="Detailed Sample Data" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {/* Mobile menu button could go here */}
                 </div>
-            </nav>
-        </div>
+            </div>
+        </header>
     );
 };
 

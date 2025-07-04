@@ -1,10 +1,9 @@
-
 import React from 'react';
-import { FormData, Member } from '../../types';
+import { FormData } from '../../types';
+import { useAppContext } from '../../context/AppContext';
 
 interface CollaboratorsViewProps {
     project: FormData;
-    members: Member[];
 }
 
 const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: React.ReactNode }> = ({ label, value, children }) => (
@@ -16,7 +15,8 @@ const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: R
 );
 
 
-const CollaboratorsView: React.FC<CollaboratorsViewProps> = ({ project, members }) => {
+const CollaboratorsView: React.FC<CollaboratorsViewProps> = ({ project }) => {
+    const { members } = useAppContext();
     
     return (
         <section>

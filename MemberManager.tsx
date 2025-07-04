@@ -1,21 +1,21 @@
 import React, { useState } from 'react';
+import { produce } from 'https://esm.sh/immer';
 import MemberList from './components/MemberList';
 import MemberEditor from './components/MemberEditor';
 import MemberViewer from './components/MemberViewer';
+import ConfirmationModal from './components/ui/ConfirmationModal';
 import { initialMemberData } from './constants';
-import { Member, FormData } from './types';
+import { Member } from './types';
+import { useAppContext } from './context/AppContext';
 
 type ViewMode = 'list' | 'edit' | 'view';
 
-interface MemberManagerProps {
-  members: Member[];
-  setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
-  projects: FormData[];
-}
-
-const MemberManager: React.FC<MemberManagerProps> = ({ members, setMembers, projects }) => {
+const MemberManager: React.FC = () => {
+  const { members, setMembers, projects, setProjects, tasks, setTasks, notify } = useAppContext();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentMember, setCurrentMember] = useState<Member | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
   const handleAddMember = () => {
     const newMember: Member = {
@@ -43,17 +43,47 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, setMembers, proj
   };
 
   const handleDeleteMember = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this member? This cannot be undone.')) {
-      setMembers(members.filter(p => p.id !== id));
-      // Optional: Also remove this member from all projects they are assigned to.
-      // This is a more complex operation that would require updating the projects state as well.
-      // For now, we just delete the member.
-      setViewMode('list');
-      setCurrentMember(null);
-    }
+    setMemberToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDeleteMember = () => {
+    if (!memberToDelete) return;
+
+    // Remove member from collaborator lists in projects
+    setProjects(currentProjects => 
+        produce(currentProjects, draft => {
+            draft.forEach(project => {
+                project.collaboratorDetails = project.collaboratorDetails.filter(c => c.memberId !== memberToDelete);
+            });
+        })
+    );
+
+    // Unassign member from tasks
+    setTasks(currentTasks => 
+        produce(currentTasks, draft => {
+            draft.forEach(task => {
+                if (task.assignedMemberId === memberToDelete) {
+                    task.assignedMemberId = '';
+                }
+            });
+        })
+    );
+
+    // Delete the member
+    setMembers(prev => prev.filter(m => m.id !== memberToDelete));
+    
+    notify('Member deleted and unassigned from all projects and tasks.', 'success');
+
+    // Reset state
+    setViewMode('list');
+    setCurrentMember(null);
+    setIsDeleteModalOpen(false);
+    setMemberToDelete(null);
   };
 
   const handleSaveMember = (memberToSave: Member) => {
+    const isNew = !members.some(m => m.id === memberToSave.id);
     setMembers(prevMembers => {
       const index = prevMembers.findIndex(p => p.id === memberToSave.id);
       if (index > -1) {
@@ -64,6 +94,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, setMembers, proj
         return [...prevMembers, memberToSave];
       }
     });
+    notify(isNew ? 'Member added successfully!' : 'Member updated successfully!', 'success');
     setViewMode('list');
     setCurrentMember(null);
   };
@@ -83,7 +114,7 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, setMembers, proj
                 onCancel={handleBackToList}
               />;
           case 'view':
-              return currentMember && <MemberViewer member={currentMember} onBack={handleBackToList} projects={projects} />;
+              return currentMember && <MemberViewer member={currentMember} onBack={handleBackToList} />;
           case 'list':
           default:
             return <MemberList
@@ -100,6 +131,23 @@ const MemberManager: React.FC<MemberManagerProps> = ({ members, setMembers, proj
     <div className="font-sans text-slate-800">
       <main className="w-full">
         {renderContent()}
+        {isDeleteModalOpen && (
+            <ConfirmationModal
+            isOpen={isDeleteModalOpen}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirm={confirmDeleteMember}
+            title="Delete Member"
+            message={
+                <>
+                Are you sure you want to delete this member?
+                <br />
+                They will be removed from all projects and unassigned from all tasks. 
+                <strong className="font-bold text-red-700"> This action cannot be undone.</strong>
+                </>
+            }
+            confirmButtonText="Delete Member"
+            />
+        )}
       </main>
     </div>
   );

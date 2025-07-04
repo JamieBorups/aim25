@@ -1,18 +1,18 @@
-
 import React, { useState } from 'react';
-import { FormData, Collaborator, Member } from '../../types';
+import { FormData, Collaborator } from '../../types';
 import FormField from '../ui/FormField';
 import { TextareaWithCounter } from '../ui/TextareaWithCounter';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
+import { useAppContext } from '../../context/AppContext';
 
 interface Props {
   formData: FormData;
   onChange: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
-  members: Member[];
 }
 
-const CollaboratorsTab: React.FC<Props> = ({ formData, onChange, members }) => {
+const CollaboratorsTab: React.FC<Props> = ({ formData, onChange }) => {
+    const { members } = useAppContext();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedMemberId, setSelectedMemberId] = useState('');
     const [role, setRole] = useState('');

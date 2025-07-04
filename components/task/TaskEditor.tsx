@@ -1,27 +1,37 @@
-
 import React, { useState, useMemo } from 'react';
-import { Task, FormData, Member, BudgetItem, DetailedBudget } from '../../types';
-import { initialTaskData, TASK_STATUSES, WORK_TYPES } from '../../constants';
+import { Task, DetailedBudget, TaskType } from '../../types';
+import { TASK_STATUSES, WORK_TYPES, TASK_TYPES } from '../../constants';
 import FormField from '../ui/FormField';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { TextareaWithCounter } from '../ui/TextareaWithCounter';
+import { useAppContext } from '../../context/AppContext';
 
 interface TaskEditorProps {
   task: Task;
   onSave: (task: Task) => void;
   onCancel: () => void;
-  projects: FormData[];
-  members: Member[];
 }
 
 type ExpenseCategory = keyof DetailedBudget['expenses'];
 
-const TaskEditor: React.FC<TaskEditorProps> = ({ task, onSave, onCancel, projects, members }) => {
+const TaskEditor: React.FC<TaskEditorProps> = ({ task, onSave, onCancel }) => {
+  const { projects, members } = useAppContext();
   const [formData, setFormData] = useState<Task>(task);
 
   const handleFormChange = <K extends keyof Task>(field: K, value: Task[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  const handleTaskTypeChange = (taskType: TaskType) => {
+    const newFormData = {...formData, taskType};
+    if(taskType === 'Milestone') {
+      newFormData.budgetItemId = '';
+      newFormData.estimatedHours = 0;
+      newFormData.hourlyRate = 0;
+      newFormData.workType = 'Paid';
+    }
+    setFormData(newFormData);
   };
 
   const handleProjectChange = (projectId: string) => {
@@ -69,10 +79,19 @@ const TaskEditor: React.FC<TaskEditorProps> = ({ task, onSave, onCancel, project
     <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex justify-center items-center p-4">
       <div className="bg-white p-6 sm:p-8 rounded-lg shadow-xl w-full max-w-2xl max-h-full overflow-y-auto">
         <form onSubmit={handleSave}>
-          <h3 className="text-2xl font-bold mb-6 border-b pb-4 text-slate-800">{formData.id ? 'Edit Task' : 'Add New Task'}</h3>
+          <div className="flex justify-between items-start mb-6 border-b pb-4 text-slate-800">
+            <div>
+              <h3 className="text-2xl font-bold">{formData.id ? 'Edit Task' : 'Add New Task'}</h3>
+              {formData.taskCode && <p className="text-sm text-slate-500 font-mono mt-1">Task ID: {formData.taskCode}</p>}
+            </div>
+          </div>
           <div className="space-y-5">
             <FormField label="Task Title" htmlFor="title" required>
               <Input id="title" value={formData.title} onChange={e => handleFormChange('title', e.target.value)} />
+            </FormField>
+            
+             <FormField label="Task Type" htmlFor="taskType" required>
+                <Select id="taskType" value={formData.taskType} onChange={e => handleTaskTypeChange(e.target.value as TaskType)} options={TASK_TYPES} />
             </FormField>
 
             <FormField label="Description" htmlFor="description">
@@ -100,36 +119,38 @@ const TaskEditor: React.FC<TaskEditorProps> = ({ task, onSave, onCancel, project
                 </FormField>
             </div>
             
-            <div className="bg-slate-100 p-4 rounded-md border border-slate-200">
-                <h4 className="text-md font-semibold text-slate-700 mb-3">Time & Budget</h4>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <FormField label="Estimated Hours" htmlFor="estimatedHours">
-                        <Input type="number" id="estimatedHours" value={formData.estimatedHours || ''} onChange={e => handleFormChange('estimatedHours', parseFloat(e.target.value) || 0)} step="0.5" />
+            {formData.taskType === 'Time-Based' && (
+                <div className="bg-slate-100 p-4 rounded-md border border-slate-200">
+                    <h4 className="text-md font-semibold text-slate-700 mb-3">Time & Budget</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <FormField label="Estimated Hours" htmlFor="estimatedHours">
+                            <Input type="number" id="estimatedHours" value={formData.estimatedHours || ''} onChange={e => handleFormChange('estimatedHours', parseFloat(e.target.value) || 0)} step="0.5" />
+                        </FormField>
+                    </div>
+                    <FormField label="Budget Line Item" htmlFor="budgetItemId">
+                        <Select id="budgetItemId" value={formData.budgetItemId} onChange={e => handleFormChange('budgetItemId', e.target.value)} options={budgetItemOptions} disabled={!formData.projectId} />
                     </FormField>
-                </div>
-                <FormField label="Budget Line Item" htmlFor="budgetItemId">
-                    <Select id="budgetItemId" value={formData.budgetItemId} onChange={e => handleFormChange('budgetItemId', e.target.value)} options={budgetItemOptions} disabled={!formData.projectId} />
-                </FormField>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <FormField label="Work Type" htmlFor="workType">
-                        <Select id="workType" value={formData.workType} onChange={e => handleFormChange('workType', e.target.value as Task['workType'])} options={WORK_TYPES} />
-                    </FormField>
-                    <FormField 
-                        label={formData.workType === 'Paid' ? "Hourly Rate ($)" : "Hourly Value ($)"}
-                        htmlFor="hourlyRate"
-                        instructions={formData.workType !== 'Paid' && "Assign a monetary value for in-kind/volunteer contributions for reporting."}
-                    >
-                        <Input 
-                            type="number" 
-                            id="hourlyRate" 
-                            value={formData.hourlyRate || ''} 
-                            onChange={e => handleFormChange('hourlyRate', parseFloat(e.target.value) || 0)} 
-                            step="0.01" 
-                        />
-                    </FormField>
-                 </div>
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <FormField label="Work Type" htmlFor="workType">
+                            <Select id="workType" value={formData.workType} onChange={e => handleFormChange('workType', e.target.value as Task['workType'])} options={WORK_TYPES} />
+                        </FormField>
+                        <FormField 
+                            label={formData.workType === 'Paid' ? "Hourly Rate ($)" : "Hourly Value ($)"}
+                            htmlFor="hourlyRate"
+                            instructions={formData.workType !== 'Paid' && "Assign a monetary value for in-kind/volunteer contributions for reporting."}
+                        >
+                            <Input 
+                                type="number" 
+                                id="hourlyRate" 
+                                value={formData.hourlyRate || ''} 
+                                onChange={e => handleFormChange('hourlyRate', parseFloat(e.target.value) || 0)} 
+                                step="0.01" 
+                            />
+                        </FormField>
+                    </div>
+                </div>
+            )}
 
           </div>
           <div className="mt-8 flex justify-end space-x-3 border-t pt-5">

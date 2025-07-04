@@ -1,23 +1,21 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { Activity, Task, Member, FormData as ProjectData } from '../../types';
+import { Activity } from '../../types';
 import FormField from '../ui/FormField';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { TextareaWithCounter } from '../ui/TextareaWithCounter';
 import { CheckboxGroup } from '../ui/CheckboxGroup';
+import { useAppContext } from '../../context/AppContext';
 
 interface ActivityEditorProps {
   activity: Activity;
   onSave: (activity: Activity & { memberIds?: string[] }) => void;
   onCancel: () => void;
-  tasks: Task[];
-  members: Member[];
-  projects: ProjectData[];
   selectedProjectId: string;
 }
 
-const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCancel, tasks, members, projects, selectedProjectId }) => {
+const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCancel, selectedProjectId }) => {
+  const { tasks, members, projects } = useAppContext();
   
   const getInitialProjectId = () => {
     if (activity.taskId) {
@@ -36,23 +34,41 @@ const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCan
   });
 
   const isEditing = !!activity.id;
+  const areTimesSet = formData.startTime && formData.endTime;
 
-  // DEFINITIVE FIX: Use useEffect to ensure taskOptions are always fresh.
-  // This hook runs when the component mounts and whenever `currentProjectId` or `tasks` changes.
+  useEffect(() => {
+    if (formData.startTime && formData.endTime) {
+        const start = new Date(`1970-01-01T${formData.startTime}:00Z`);
+        const end = new Date(`1970-01-01T${formData.endTime}:00Z`);
+
+        if (end > start) {
+            const diffMs = end.getTime() - start.getTime();
+            const diffHours = diffMs / (1000 * 60 * 60);
+            // Round to nearest quarter hour
+            const roundedHours = Math.round(diffHours * 4) / 4;
+            setFormData(prev => ({...prev, hours: roundedHours}));
+        } else {
+            setFormData(prev => ({...prev, hours: 0}));
+        }
+    }
+  }, [formData.startTime, formData.endTime]);
+
+  // Update task options when project changes
   useEffect(() => {
     if (!currentProjectId) {
       setTaskOptions([{ value: '', label: 'Select a project first' }]);
       return;
     }
     
-    const filteredTasks = tasks.filter(t => t.projectId === currentProjectId);
+    // Only allow logging activities against Time-Based tasks
+    const filteredTasks = tasks.filter(t => t.projectId === currentProjectId && t.taskType === 'Time-Based');
     
     if (filteredTasks.length === 0) {
-      setTaskOptions([{ value: '', label: 'No tasks in this project' }]);
+      setTaskOptions([{ value: '', label: 'No time-based tasks in project' }]);
       return;
     }
     
-    const options = [{ value: '', label: 'Select a task' }, ...filteredTasks.map(t => ({ value: t.id, label: t.title }))];
+    const options = [{ value: '', label: 'Select a task' }, ...filteredTasks.map(t => ({ value: t.id, label: `${t.taskCode}: ${t.title}` }))];
     setTaskOptions(options);
     
   }, [currentProjectId, tasks]);
@@ -158,17 +174,27 @@ const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCan
               <TextareaWithCounter id="description" rows={4} value={formData.description} onChange={e => handleFormChange('description', e.target.value)} wordLimit={200} />
             </FormField>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <FormField label="Start Date" htmlFor="startDate" required>
                 <Input type="date" id="startDate" value={formData.startDate} onChange={e => handleFormChange('startDate', e.target.value)} />
               </FormField>
               <FormField label="End Date" htmlFor="endDate" required>
                 <Input type="date" id="endDate" value={formData.endDate} onChange={e => handleFormChange('endDate', e.target.value)} />
               </FormField>
+            </div>
+            
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <FormField label="Start Time" htmlFor="startTime" instructions="Optional">
+                <Input type="time" id="startTime" value={formData.startTime || ''} onChange={e => handleFormChange('startTime', e.target.value)} />
+              </FormField>
+              <FormField label="End Time" htmlFor="endTime" instructions="Optional">
+                <Input type="time" id="endTime" value={formData.endTime || ''} onChange={e => handleFormChange('endTime', e.target.value)} />
+              </FormField>
               <FormField label={`Hours Spent ${!isEditing ? '(each)' : ''}`} htmlFor="hours" required>
-                <Input type="number" id="hours" value={formData.hours || ''} onChange={e => handleFormChange('hours', parseFloat(e.target.value) || 0)} step="0.25" />
+                <Input type="number" id="hours" value={formData.hours || ''} onChange={e => handleFormChange('hours', parseFloat(e.target.value) || 0)} step="0.25" disabled={!!areTimesSet} title={areTimesSet ? "Hours are calculated automatically from start/end times" : "Enter hours spent"} />
               </FormField>
             </div>
+
             {showBulkSummary && (
                 <div className="bg-teal-50 text-teal-800 p-3 rounded-md text-center text-sm border border-teal-200">
                     This will create <span className="font-bold">{formData.memberIds.length}</span> separate activity logs for a total of <span className="font-bold">{totalHours.toFixed(2)} hours</span>.

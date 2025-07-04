@@ -14,6 +14,7 @@ import {
 
 interface ProjectInfoViewProps {
     project: FormData;
+    hideTitle?: boolean;
 }
 
 const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: React.ReactNode }> = ({ label, value, children }) => (
@@ -24,7 +25,7 @@ const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: R
     </div>
 );
 
-const ProjectInfoView: React.FC<ProjectInfoViewProps> = ({ project }) => {
+const ProjectInfoView: React.FC<ProjectInfoViewProps> = ({ project, hideTitle = false }) => {
 
     const genreMap: Record<string, { data: string[], definitions: {value: string, label: string}[]}> = {
         craft: { data: project.craftGenres, definitions: CRAFT_GENRES },
@@ -60,7 +61,7 @@ const ProjectInfoView: React.FC<ProjectInfoViewProps> = ({ project }) => {
 
     return (
         <section>
-            <h2 className="text-2xl font-bold text-slate-800 border-b-2 border-teal-500 pb-2 mb-6">Project Information</h2>
+            {!hideTitle && <h2 className="text-2xl font-bold text-slate-800 border-b-2 border-teal-500 pb-2 mb-6">Project Information</h2>}
             
             <ViewField label="Artistic Disciplines & Genres" value={renderArtisticDisciplines()} />
 

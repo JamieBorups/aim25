@@ -1,10 +1,12 @@
 
+
+
 import React, { useState } from 'react';
-import { produce } from 'immer';
-import { FormData, BudgetItem } from '../../types';
+import { produce } from 'https://esm.sh/immer';
+import { FormData, BudgetItem, BudgetItemStatus } from '../../types';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import { EXPENSE_FIELDS, REVENUE_FIELDS } from '../../constants';
+import { EXPENSE_FIELDS, REVENUE_FIELDS, BUDGET_ITEM_STATUS_OPTIONS } from '../../constants';
 import { useBudgetCalculations } from '../../hooks/useBudgetCalculations';
 
 interface Props {
@@ -21,9 +23,10 @@ interface BudgetCategoryManagerProps {
     items: BudgetItem[];
     options: { value: string; label: string }[];
     onChange: (items: BudgetItem[]) => void;
+    isRevenue?: boolean;
 }
 
-const BudgetCategoryManager: React.FC<BudgetCategoryManagerProps> = ({ items, options, onChange }) => {
+const BudgetCategoryManager: React.FC<BudgetCategoryManagerProps> = ({ items, options, onChange, isRevenue = false }) => {
     const [newItemSource, setNewItemSource] = useState('');
 
     const handleAddItem = () => {
@@ -37,12 +40,13 @@ const BudgetCategoryManager: React.FC<BudgetCategoryManagerProps> = ({ items, op
             source: option.value,
             description: '',
             amount: 0,
+            ...(isRevenue && { status: 'Pending' })
         };
         onChange([...items, newItem]);
         setNewItemSource('');
     };
 
-    const handleUpdateItem = (id: string, field: 'description' | 'amount', value: string | number) => {
+    const handleUpdateItem = (id: string, field: keyof BudgetItem, value: string | number | BudgetItemStatus) => {
         const newItems = items.map(item => {
             if (item.id === id) {
                 return { ...item, [field]: value };
@@ -60,27 +64,40 @@ const BudgetCategoryManager: React.FC<BudgetCategoryManagerProps> = ({ items, op
         return options.find(o => o.value === source)?.label || source;
     };
     
-    const usedSources = new Set(items.map(item => item.source));
-    const availableOptions = options.filter(opt => !usedSources.has(opt.value) || opt.value.toLowerCase().includes('other'));
+    const availableOptions = options;
+    
+    const gridCols = isRevenue ? 'grid-cols-12' : 'grid-cols-12';
 
     return (
         <div className="space-y-3">
             {items.length > 0 && (
                 <div className="space-y-2 border-b border-slate-200 pb-3 mb-3">
-                    <div className="hidden md:grid grid-cols-12 gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <div className={`hidden md:grid ${gridCols} gap-2 text-xs font-semibold text-slate-500 uppercase tracking-wider`}>
                         <div className="md:col-span-4">Item</div>
-                        <div className="md:col-span-5">Description</div>
+                        {isRevenue && <div className="md:col-span-2">Status</div>}
+                        <div className="md:col-span-4">Description</div>
                         <div className="md:col-span-2 text-right">Amount</div>
                         <div className="md:col-span-1"></div>
                     </div>
                     {items.map(item => (
-                        <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2 items-center">
+                        <div key={item.id} className={`grid grid-cols-1 md:${gridCols} gap-2 items-center`}>
                             <div className="md:col-span-4 text-sm text-slate-800 font-medium">{getLabelForSource(item.source)}</div>
-                            <div className="md:col-span-5">
+                            {isRevenue && (
+                                <div className="md:col-span-2">
+                                    <Select
+                                        aria-label={`Status for ${getLabelForSource(item.source)}`}
+                                        value={item.status || 'Pending'}
+                                        onChange={e => handleUpdateItem(item.id, 'status', e.target.value as BudgetItemStatus)}
+                                        options={BUDGET_ITEM_STATUS_OPTIONS}
+                                        className="text-xs py-1"
+                                    />
+                                </div>
+                            )}
+                            <div className="md:col-span-4">
                                 <Input
                                     aria-label={`Description for ${getLabelForSource(item.source)}`}
                                     type="text"
-                                    placeholder="Description"
+                                    placeholder="Description (e.g., 'Per diem for Elder 1')"
                                     value={item.description}
                                     onChange={e => handleUpdateItem(item.id, 'description', e.target.value)}
                                 />
@@ -195,6 +212,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
                     items={budget.revenues.grants}
                     options={REVENUE_FIELDS.grants.map(f => ({ value: f.key, label: f.label }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'grants'], items)}
+                    isRevenue={true}
                 />
             </BudgetSection>
 
@@ -225,6 +243,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
                     items={budget.revenues.sales}
                     options={REVENUE_FIELDS.sales.map(f => ({ value: f.key, label: f.label }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'sales'], items)}
+                    isRevenue={true}
                 />
             </BudgetSection>
 
@@ -233,6 +252,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
                     items={budget.revenues.fundraising}
                     options={REVENUE_FIELDS.fundraising.map(f => ({ value: f.key, label: f.label }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'fundraising'], items)}
+                    isRevenue={true}
                 />
             </BudgetSection>
 
@@ -241,6 +261,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
                     items={budget.revenues.contributions}
                     options={REVENUE_FIELDS.contributions.map(f => ({ value: f.key, label: f.label }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'contributions'], items)}
+                    isRevenue={true}
                 />
             </BudgetSection>
             

@@ -26,7 +26,7 @@ const MemberList: React.FC<MemberListProps> = ({ members, onAddMember, onEditMem
       {members.length === 0 ? (
         <div className="text-center py-16">
           <i className="fa-solid fa-users text-6xl text-slate-300"></i>
-          <h3 className="mt-4 text-lg font-medium text-slate-800">No members yet</h3>
+          <h3 className="mt-4 text-lg font-medium text-slate-800">No members have been added.</h3>
           <p className="text-slate-500 mt-1">Click "Add New Member" to build your collective!</p>
         </div>
       ) : (

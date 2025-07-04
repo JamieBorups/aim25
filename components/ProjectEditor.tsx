@@ -1,19 +1,19 @@
-
 import React, { useState, useCallback } from 'react';
 import { TABS } from '../constants';
-import { FormData, TabId, Member } from '../types';
+import { FormData, TabId } from '../types';
 import ProjectInformationTab from './tabs/ProjectInformationTab';
 import CollaboratorsTab from './tabs/CollaboratorsTab';
 import BudgetTab from './tabs/BudgetTab';
+import { useAppContext } from '../context/AppContext';
 
 interface ProjectEditorProps {
   project: FormData;
   onSave: (project: FormData) => void;
   onCancel: () => void;
-  members: Member[];
 }
 
-const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onSave, onCancel, members }) => {
+const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onSave, onCancel }) => {
+  const { members } = useAppContext();
   const [activeTab, setActiveTab] = useState<TabId>(TABS[0].id);
   const [formData, setFormData] = useState<FormData>(project);
 
@@ -31,7 +31,7 @@ const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onSave, onCancel
       case 'projectInfo':
         return <ProjectInformationTab formData={formData} onChange={handleFormChange} />;
       case 'collaborators':
-        return <CollaboratorsTab formData={formData} onChange={handleFormChange} members={members} />;
+        return <CollaboratorsTab formData={formData} onChange={handleFormChange} />;
       case 'budget':
         return <BudgetTab formData={formData} onChange={handleFormChange} />;
       default:
