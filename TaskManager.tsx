@@ -1,26 +1,18 @@
-
-
 import React, { useState } from 'react';
 import TaskList from './components/task/TaskList';
 import TaskEditor from './components/task/TaskEditor';
 import WorkplanView from './components/task/WorkplanView';
 import ActivityList from './components/task/ActivityList';
 import ActivityEditor from './components/task/ActivityEditor';
+import ConfirmationModal from './components/ui/ConfirmationModal';
 import { initialTaskData, initialActivityData } from './constants';
-import { Task, Member, FormData, TaskManagerView, Activity } from './types';
+import { Task, TaskManagerView, Activity } from './types';
 import { Select } from './components/ui/Select';
 import FormField from './components/ui/FormField';
+import { useAppContext } from './context/AppContext';
 
-interface TaskManagerProps {
-  tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  projects: FormData[];
-  members: Member[];
-  activities: Activity[];
-  setActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
-}
-
-const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, members, activities, setActivities }) => {
+const TaskManager: React.FC = () => {
+  const { tasks, setTasks, projects, members, activities, setActivities, notify } = useAppContext();
   const [view, setView] = useState<TaskManagerView>('workplan');
   const [selectedProjectId, setSelectedProjectId] = useState(''); // '' for All Projects
   
@@ -36,10 +28,44 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
   const [activitySearchTerm, setActivitySearchTerm] = useState('');
   const [activityFilterMember, setActivityFilterMember] = useState('');
 
+  // State for Task Delete Modal
+  const [isTaskDeleteModalOpen, setIsTaskDeleteModalOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   // --- Task Handlers ---
   const handleAddTask = () => {
-    const newTask: Task = { ...initialTaskData, id: `task_${Date.now()}`, projectId: selectedProjectId };
+    // 1. Generate Task Code
+    const project = projects.find(p => p.id === selectedProjectId);
+    let taskCode = '';
+    if (project) {
+        // Create prefix from project title
+        const prefix = (project.projectTitle.match(/\b(\w)/g) || ['T']).join('').toUpperCase().substring(0, 4);
+
+        // Find highest existing number for this project
+        const projectTasks = tasks.filter(t => t.projectId === selectedProjectId && t.taskCode.startsWith(prefix));
+        let maxNum = 0;
+        projectTasks.forEach(t => {
+            const numPart = t.taskCode.split('-')[1];
+            if (numPart) {
+                const num = parseInt(numPart, 10);
+                if (!isNaN(num) && num > maxNum) {
+                    maxNum = num;
+                }
+            }
+        });
+        taskCode = `${prefix}-${maxNum + 1}`;
+    } else {
+        // Fallback if no project is selected
+        taskCode = `TASK-${tasks.filter(t => !t.projectId).length + 1}`;
+    }
+    
+    // 2. Create New Task
+    const newTask: Task = { 
+        ...initialTaskData, 
+        id: `task_${Date.now()}`, 
+        projectId: selectedProjectId,
+        taskCode: taskCode, // Add the new code
+    };
     setCurrentTask(newTask);
     setIsTaskEditorOpen(true);
   };
@@ -53,13 +79,24 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
   };
 
   const handleDeleteTask = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this task? This will also delete all associated time tracking activities.')) {
-      setTasks(tasks.filter(t => t.id !== id));
-      setActivities(activities.filter(a => a.taskId !== id));
-    }
+    setTaskToDelete(id);
+    setIsTaskDeleteModalOpen(true);
+  };
+
+  const confirmDeleteTask = () => {
+    if (!taskToDelete) return;
+
+    setTasks(tasks.filter(t => t.id !== taskToDelete));
+    setActivities(activities.filter(a => a.taskId !== taskToDelete));
+
+    notify('Task and related activities deleted.', 'success');
+    
+    setIsTaskDeleteModalOpen(false);
+    setTaskToDelete(null);
   };
 
   const handleSaveTask = (taskToSave: Task) => {
+    const isNew = !tasks.some(t => t.id === taskToSave.id);
     const now = new Date().toISOString();
     const taskWithTimestamp = { ...taskToSave, updatedAt: now };
 
@@ -74,8 +111,21 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
         }
     });
 
+    notify(isNew ? 'Task created successfully!' : 'Task updated successfully!', 'success');
     setIsTaskEditorOpen(false);
     setCurrentTask(null);
+  };
+  
+  const handleToggleTaskComplete = (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task) {
+        notify(task.isComplete ? `Task '${task.title}' marked as incomplete.` : `Task '${task.title}' marked as complete.`, 'success');
+    }
+    setTasks(prevTasks => 
+        prevTasks.map(t => 
+            t.id === id ? { ...t, isComplete: !t.isComplete, status: !t.isComplete ? 'Done' : 'To Do', updatedAt: new Date().toISOString() } : t
+        )
+    );
   };
 
   // --- Activity Handlers ---
@@ -110,24 +160,28 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
   const handleDeleteActivity = (id: string) => {
     if (window.confirm('Are you sure you want to delete this activity?')) {
       setActivities(activities.filter(a => a.id !== id));
+      notify('Activity deleted.', 'success');
     }
   };
 
   const handleApproveActivity = (id: string) => {
     setActivities(prevActivities => prevActivities.map(a => a.id === id ? { ...a, status: 'Approved', updatedAt: new Date().toISOString() } : a));
+    notify('Activity approved.', 'success');
   };
   
   const handleSaveActivity = (activityToSave: Activity & { memberIds?: string[] }) => {
     const now = new Date().toISOString();
+    const isEditing = activityToSave.id && activityToSave.createdAt;
 
     // EDITING: The activity has an ID and createdAt timestamp.
-    if (activityToSave.id && activityToSave.createdAt) {
+    if (isEditing) {
         const updatedActivity = { 
             ...activityToSave, 
             updatedAt: now 
         };
         delete updatedActivity.memberIds;
         setActivities(prev => prev.map(a => a.id === updatedActivity.id ? updatedActivity : a));
+        notify('Activity updated successfully!', 'success');
     } 
     // CREATING: No ID, but has a memberIds array.
     else if (activityToSave.memberIds && activityToSave.memberIds.length > 0) {
@@ -142,6 +196,7 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
             updatedAt: now,
         }));
         setActivities(prev => [...prev, ...newActivities]);
+        notify(`${newActivities.length} new activity log(s) created!`, 'success');
         
         // THE FIX: Reset filters to guarantee the new item is visible.
         setActivitySearchTerm('');
@@ -198,14 +253,10 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
         </div>
         
         <div className="py-2">
-            {view === 'workplan' && <WorkplanView tasks={tasks} projects={projects} members={members} activities={activities} selectedProjectId={selectedProjectId} />}
-            {view === 'tasks' && <TaskList tasks={filteredTasks} projects={projects} members={members} onAddTask={handleAddTask} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} selectedProjectId={selectedProjectId} />}
+            {view === 'workplan' && <WorkplanView selectedProjectId={selectedProjectId} />}
+            {view === 'tasks' && <TaskList tasks={filteredTasks} onAddTask={handleAddTask} onEditTask={handleEditTask} onDeleteTask={handleDeleteTask} onToggleTaskComplete={handleToggleTaskComplete} selectedProjectId={selectedProjectId} />}
             {view === 'activities' && (
                 <ActivityList
-                    activities={activities}
-                    tasks={tasks}
-                    projects={projects}
-                    members={members}
                     onAddActivity={handleAddActivity}
                     onEditActivity={handleEditActivity}
                     onDeleteActivity={handleDeleteActivity}
@@ -225,8 +276,6 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
                 task={currentTask} 
                 onSave={handleSaveTask} 
                 onCancel={() => setIsTaskEditorOpen(false)} 
-                projects={projects} 
-                members={members} 
             />
         )}
         
@@ -235,11 +284,19 @@ const TaskManager: React.FC<TaskManagerProps> = ({ tasks, setTasks, projects, me
                 activity={currentActivity}
                 onSave={handleSaveActivity}
                 onCancel={() => setIsActivityEditorOpen(false)}
-                tasks={tasks}
-                members={members}
-                projects={projects}
                 selectedProjectId={selectedProjectId}
             />
+        )}
+
+        {isTaskDeleteModalOpen && (
+          <ConfirmationModal
+            isOpen={isTaskDeleteModalOpen}
+            onClose={() => setIsTaskDeleteModalOpen(false)}
+            onConfirm={confirmDeleteTask}
+            title="Delete Task"
+            message="Are you sure you want to delete this task? All associated time tracking activities will also be deleted. This cannot be undone."
+            confirmButtonText="Delete Task"
+          />
         )}
       </div>
     );

@@ -1,9 +1,20 @@
-
 import React from 'react';
 
-export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'reportsPrototype' | 'sampleData';
+export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData';
 export type TabId = 'projectInfo' | 'collaborators' | 'budget';
+export type ProjectViewTabId = 'info' | 'collaborators' | 'budget' | 'workplan' | 'insights';
 export type TaskManagerView = 'workplan' | 'tasks' | 'activities';
+export type NotificationType = 'success' | 'error' | 'info' | 'warning';
+export type ProjectStatus = 'Active' | 'On Hold' | 'Completed';
+export type DateRangeFilter = 'all' | 'last7days' | 'last30days' | 'thisMonth';
+export type BudgetItemStatus = 'Pending' | 'Approved' | 'Denied';
+
+export type SortDirection = 'asc' | 'desc';
+export type TaskSortOption = 'updatedAt' | 'dueDate' | 'assignee';
+export type TaskStatusFilter = 'all' | 'overdue' | 'dueThisWeek' | 'todo' | 'inProgress' | 'done';
+
+export type ActivitySortOption = 'date-desc' | 'date-asc' | 'updatedAt';
+export type ActivityStatusFilter = 'all' | 'pending' | 'approved';
 
 export interface Tab {
   id: TabId;
@@ -14,7 +25,7 @@ export interface Member {
     id: string;
     memberId: string;
     firstName: string;
-    lastName: string;
+    lastName:string;
     email: string;
     province: string;
     city: string;
@@ -28,6 +39,7 @@ export interface Member {
 export interface FormData {
     id: string;
     projectTitle: string;
+    status: ProjectStatus;
     artisticDisciplines: string[];
     craftGenres: string[];
     danceGenres: string[];
@@ -64,6 +76,8 @@ export interface BudgetItem {
     source: string;
     description: string;
     amount: number;
+    actualAmount?: number;
+    status?: BudgetItemStatus;
 }
 
 export interface DetailedBudget {
@@ -75,6 +89,7 @@ export interface DetailedBudget {
             venueCapacity: number;
             avgTicketPrice: number;
             description: string;
+            actualTotalTickets?: number;
         };
         sales: BudgetItem[];
         fundraising: BudgetItem[];
@@ -90,11 +105,15 @@ export interface DetailedBudget {
     };
 }
 
+export type ExpenseCategoryType = keyof DetailedBudget['expenses'];
+
 export type TaskStatus = 'Backlog' | 'To Do' | 'In Progress' | 'Done';
 export type WorkType = 'Paid' | 'In-Kind' | 'Volunteer';
+export type TaskType = 'Time-Based' | 'Milestone';
 
 export interface Task {
     id: string;
+    taskCode: string;
     projectId: string;
     title: string;
     description: string;
@@ -102,6 +121,9 @@ export interface Task {
     status: TaskStatus;
     startDate: string;
     dueDate: string;
+    taskType: TaskType;
+    isComplete: boolean;
+    // Time-based fields
     estimatedHours: number;
     actualHours: number;
     budgetItemId: string; 
@@ -119,10 +141,21 @@ export interface Activity {
     description: string;
     startDate: string;
     endDate: string;
+    startTime?: string;
+    endTime?: string;
     hours: number;
     status: ActivityStatus;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface DirectExpense {
+  id: string;
+  projectId: string;
+  budgetItemId: string;
+  description: string;
+  amount: number;
+  date: string;
 }
 
 export interface ReportHighlight {
@@ -132,7 +165,7 @@ export interface ReportHighlight {
 }
 
 export interface Report {
-    id: string;
+    id:string;
     projectId: string;
     
     // Description Tab
@@ -166,4 +199,25 @@ export interface FormFieldProps<T> {
   wordLimit?: number;
   className?: string;
   ariaLabel?: string;
+}
+
+// NOTE: This is defined in AppContext.tsx but placing here for broader type safety
+export interface AppContextType {
+  projects: FormData[];
+  setProjects: React.Dispatch<React.SetStateAction<FormData[]>>;
+  members: Member[];
+  setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
+  activities: Activity[];
+  setActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
+  directExpenses: DirectExpense[];
+  setDirectExpenses: React.Dispatch<React.SetStateAction<DirectExpense[]>>;
+  reports: Report[];
+  setReports: React.Dispatch<React.SetStateAction<Report[]>>;
+  notify: (message: string, type: NotificationType) => void;
+  approveActivity: (activityId: string) => void;
+  reportProjectIdToOpen: string | null;
+  setReportProjectIdToOpen: React.Dispatch<React.SetStateAction<string | null>>;
+  clearAllData: () => void;
 }
