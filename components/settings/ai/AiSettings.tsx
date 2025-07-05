@@ -1,13 +1,14 @@
 
+
 import React, { useState } from 'react';
-import { produce } from 'https://esm.sh/immer';
-import { useAppContext } from '../../context/AppContext';
-import { AppSettings, AiPersonaName, AiPersonaSettings } from '../../types';
-import { initialSettings } from '../../context/AppContext';
-import MainAiTab from './ai/MainAiTab';
-import ModuleAiTab from './ai/ModuleAiTab';
-import PersonaTestModal from './ai/PersonaTestModal';
-import ConfirmationModal from '../ui/ConfirmationModal';
+import { produce } from 'immer';
+import { useAppContext } from '../../../context/AppContext';
+import { AppSettings, AiPersonaName, AiPersonaSettings } from '../../../types';
+import { initialSettings } from '../../../context/AppContext';
+import MainAiTab from './MainAiTab';
+import ModuleAiTab from './ModuleAiTab';
+import PersonaTestModal from './PersonaTestModal';
+import ConfirmationModal from '../../ui/ConfirmationModal';
 
 const AiSettings: React.FC = () => {
     const { state, dispatch, notify } = useAppContext();
@@ -28,7 +29,18 @@ const AiSettings: React.FC = () => {
     
     const handlePersonaChange = (personaName: AiPersonaName, field: keyof AiPersonaSettings, value: any) => {
         setSettings(prev => produce(prev, draft => {
-            draft.personas[personaName][field] = value;
+            const persona = draft.personas[personaName];
+            switch (field) {
+                case 'instructions':
+                    persona.instructions = value;
+                    break;
+                case 'model':
+                    persona.model = value;
+                    break;
+                case 'temperature':
+                    persona.temperature = value;
+                    break;
+            }
         }));
         setIsDirty(true);
     };

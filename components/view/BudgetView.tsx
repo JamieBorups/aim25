@@ -3,7 +3,7 @@
 
 
 import React, { useMemo, useState } from 'react';
-import { produce } from 'https://esm.sh/immer';
+import { produce } from 'immer';
 import { DetailedBudget, BudgetItem, Task, Activity, DirectExpense, ExpenseCategoryType, FormData, BudgetItemStatus } from '../../types';
 import { useBudgetCalculations } from '../../hooks/useBudgetCalculations';
 import { REVENUE_FIELDS, EXPENSE_FIELDS } from '../../constants';

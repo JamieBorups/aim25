@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import Layout from './components/Layout';
@@ -9,7 +10,11 @@ import ReportsPage from './components/ReportsPage';
 import SampleData from './components/SampleData';
 import DetailedSampleData from './components/DetailedSampleData';
 import SettingsManager from './components/settings/SettingsManager';
+import ImportExportPage from './components/ImportExportPage';
 import { Page } from './types';
+import TaskAssessorPage from './components/tools/TaskAssessorPage';
+import ProjectAssessorPage from './components/tools/ProjectAssessorPage';
+import AiWorkshopPage from './components/pages/AiWorkshopPage';
 
 const App: React.FC = () => {
   const [activePage, setActivePage] = useState<Page>('home');
@@ -25,6 +30,10 @@ const App: React.FC = () => {
         {activePage === 'sampleData' && <SampleData />}
         {activePage === 'detailedSampleData' && <DetailedSampleData />}
         {activePage === 'settings' && <SettingsManager />}
+        {activePage === 'importExport' && <ImportExportPage />}
+        {activePage === 'taskAssessor' && <TaskAssessorPage onNavigate={setActivePage} />}
+        {activePage === 'projectAssessor' && <ProjectAssessorPage onNavigate={setActivePage} />}
+        {activePage === 'aiWorkshop' && <AiWorkshopPage onNavigate={setActivePage} />}
       </Layout>
     </AppProvider>
   );

@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData' | 'settings';
+export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData' | 'settings' | 'importExport' | 'taskAssessor' | 'projectAssessor' | 'aiWorkshop';
 export type TabId = 'projectInfo' | 'collaborators' | 'budget';
 export type ProjectViewTabId = 'info' | 'collaborators' | 'budget' | 'workplan' | 'insights';
 export type TaskManagerView = 'workplan' | 'tasks' | 'activities';
@@ -211,6 +211,14 @@ export interface CustomDiscipline { id: string; name: string; genres: { id: stri
 export interface CustomRole { id: string; name: string; }
 export interface CustomTaskStatus { id: string; name: string; color: string; }
 
+export type AiPersonaName = 'main' | 'projects' | 'members' | 'tasks' | 'budget' | 'reports';
+
+export interface AiPersonaSettings {
+  instructions: string;
+  model: string;
+  temperature: number; // 0 (precise) to 1 (creative)
+}
+
 export interface AppSettings {
   general: {
     collectiveName: string;
@@ -240,11 +248,41 @@ export interface AppSettings {
   };
   ai: {
     enabled: boolean;
-    model: string;
-    quality: 'fastest' | 'balanced' | 'highest';
-    systemInstruction: string;
+    plainTextMode: boolean;
+    personas: Record<AiPersonaName, AiPersonaSettings>;
   };
 }
+
+// --- Import/Export ---
+export interface ProjectExportData {
+  project: FormData;
+  tasks: Task[];
+  activities: Activity[];
+  directExpenses: DirectExpense[];
+  members: Member[];
+}
+
+export interface ProjectExportFile {
+  type: "ARTS_INCUBATOR_PROJECT_EXPORT";
+  appVersion: string;
+  exportDate: string;
+  data: ProjectExportData;
+}
+
+export interface WorkspaceExportFile {
+  type: "ARTS_INCUBATOR_WORKSPACE_BACKUP";
+  appVersion: string;
+  exportDate: string;
+  data: Omit<AppState, 'reportProjectIdToOpen' | 'activeWorkshopItem'>;
+}
+
+export interface AiSettingsExportFile {
+  type: "ARTS_INCUBATOR_AI_SETTINGS_EXPORT";
+  appVersion: string;
+  exportDate: string;
+  data: AppSettings['ai'];
+}
+
 
 // --- Reducer State & Actions ---
 export interface AppState {
@@ -256,17 +294,29 @@ export interface AppState {
     reports: Report[];
     settings: AppSettings;
     reportProjectIdToOpen: string | null;
+    activeWorkshopItem: {
+      type: 'task';
+      itemId: string;
+    } | {
+      type: 'project';
+      itemId: string;
+      fieldKey: keyof FormData | 'artisticDisciplinesAndGenres';
+      fieldLabel: string;
+    } | null;
 }
 
 export type Action =
   | { type: 'SET_PROJECTS'; payload: FormData[] }
+  | { type: 'UPDATE_PROJECT_PARTIAL'; payload: { projectId: string; data: Partial<FormData> } }
   | { type: 'UPDATE_PROJECT_STATUS'; payload: { projectId: string; status: ProjectStatus | string } }
   | { type: 'DELETE_PROJECT'; payload: string }
   | { type: 'SET_MEMBERS'; payload: Member[] }
   | { type: 'DELETE_MEMBER'; payload: string }
   | { type: 'SET_TASKS'; payload: Task[] }
   | { type: 'ADD_TASK'; payload: Task }
+  | { type: 'ADD_TASKS'; payload: Task[] }
   | { type: 'UPDATE_TASK'; payload: Task }
+  | { type: 'UPDATE_TASK_PARTIAL'; payload: { taskId: string; data: Partial<Pick<Task, 'title' | 'description'>> } }
   | { type: 'DELETE_TASK'; payload: string }
   | { type: 'SET_ACTIVITIES'; payload: Activity[] }
   | { type: 'ADD_ACTIVITIES'; payload: Activity[] }
@@ -278,8 +328,10 @@ export type Action =
   | { type: 'SET_REPORTS'; payload: Report[] }
   | { type: 'UPDATE_SETTINGS'; payload: AppSettings }
   | { type: 'SET_REPORT_PROJECT_ID_TO_OPEN'; payload: string | null }
+  | { type: 'SET_ACTIVE_WORKSHOP_ITEM'; payload: AppState['activeWorkshopItem'] }
+  | { type: 'ADD_PROJECT_DATA', payload: ProjectExportData }
   | { type: 'CLEAR_ALL_DATA' }
-  | { type: 'LOAD_DATA'; payload: Omit<Partial<AppState>, 'reportProjectIdToOpen'> };
+  | { type: 'LOAD_DATA'; payload: Omit<Partial<AppState>, 'reportProjectIdToOpen' | 'activeWorkshopItem'> };
 
 
 // --- App Context Type ---

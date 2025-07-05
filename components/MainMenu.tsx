@@ -121,6 +121,11 @@ const MainMenu: React.FC<MainMenuProps> = ({ activePage, onNavigate }) => {
                                 {isDropdownOpen && (
                                     <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">
                                         <div className="py-1" role="none">
+                                            <DropdownLink page="taskAssessor" icon="fa-solid fa-wand-magic-sparkles" label="AI Task Assessor" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
+                                            <DropdownLink page="projectAssessor" icon="fa-solid fa-diagram-project" label="Project AI Assistant" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
+                                            <div className="border-t border-slate-100 my-1"></div>
+                                            <DropdownLink page="importExport" icon="fa-solid fa-right-left" label="Import / Export Data" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
+                                            <div className="border-t border-slate-100 my-1"></div>
                                             <DropdownLink page="sampleData" icon="fa-solid fa-flask-vial" label="Project Sample Data" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
                                             <DropdownLink page="detailedSampleData" icon="fa-solid fa-database" label="Detailed Sample Data" activePage={activePage} onNavigate={onNavigate} onClick={() => setIsDropdownOpen(false)} />
                                         </div>

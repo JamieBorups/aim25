@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { produce } from 'https://esm.sh/immer';
+import { produce } from 'immer';
 import { useAppContext } from '../../context/AppContext';
 import { AppSettings, CustomStatus } from '../../types';
 import ListEditor from '../ui/ListEditor';

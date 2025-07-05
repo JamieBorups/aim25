@@ -4,7 +4,7 @@ import GeneralSettings from './GeneralSettings';
 import ProjectSettings from './ProjectSettings';
 import MemberSettings from './MemberSettings';
 import TaskSettings from './TaskSettings';
-import AiSettings from './AiSettings';
+import AiSettings from './ai/AiSettings';
 import BudgetSettings from './BudgetSettings';
 
 const SettingsManager: React.FC = () => {

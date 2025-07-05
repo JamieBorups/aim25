@@ -1,4 +1,5 @@
 
+
 import { FormData, Tab, DetailedBudget, Member, Task, TaskStatus, WorkType, Activity, Report, TaskType, ProjectStatus, BudgetItemStatus, TaskSortOption, TaskStatusFilter, ActivitySortOption, ActivityStatusFilter, DateRangeFilter } from './types';
 
 export const TABS: Tab[] = [
@@ -416,4 +417,16 @@ export const BUDGET_ITEM_STATUS_OPTIONS: { value: BudgetItemStatus, label: strin
     { value: 'Pending', label: 'Pending' },
     { value: 'Approved', label: 'Approved' },
     { value: 'Denied', label: 'Denied' },
+];
+
+export const PROJECT_ASSESSABLE_FIELDS: { key: keyof FormData | 'artisticDisciplinesAndGenres', label: string }[] = [
+    { key: 'projectTitle', label: 'Project Title' },
+    { key: 'artisticDisciplinesAndGenres', label: 'Artistic Disciplines & Genres' },
+    { key: 'background', label: 'Background' },
+    { key: 'projectDescription', label: 'Project Description' },
+    { key: 'audience', label: 'Audience & Participants' },
+    { key: 'paymentAndConditions', label: 'Payment & Working Conditions' },
+    { key: 'schedule', label: 'Schedule' },
+    { key: 'culturalIntegrity', label: 'Cultural Integrity' },
+    { key: 'additionalInfo', label: 'Additional Information' },
 ];

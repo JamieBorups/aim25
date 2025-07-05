@@ -3,7 +3,7 @@
 
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { produce } from 'https://esm.sh/immer';
+import { produce } from 'immer';
 import { FormData, Member, Task, Report, ReportHighlight, Activity, DirectExpense } from '../types';
 import { Select } from './ui/Select';
 import { Input } from './ui/Input';
