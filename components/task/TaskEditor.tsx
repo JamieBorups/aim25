@@ -16,7 +16,7 @@ interface TaskEditorProps {
 type ExpenseCategory = keyof DetailedBudget['expenses'];
 
 const TaskEditor: React.FC<TaskEditorProps> = ({ task, onSave, onCancel }) => {
-  const { projects, members } = useAppContext();
+  const { state: { projects, members } } = useAppContext();
   const [formData, setFormData] = useState<Task>(task);
 
   const handleFormChange = <K extends keyof Task>(field: K, value: Task[K]) => {

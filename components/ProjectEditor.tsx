@@ -13,7 +13,7 @@ interface ProjectEditorProps {
 }
 
 const ProjectEditor: React.FC<ProjectEditorProps> = ({ project, onSave, onCancel }) => {
-  const { members } = useAppContext();
+  const { state: { members } } = useAppContext();
   const [activeTab, setActiveTab] = useState<TabId>(TABS[0].id);
   const [formData, setFormData] = useState<FormData>(project);
 

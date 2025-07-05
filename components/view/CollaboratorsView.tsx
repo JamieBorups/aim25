@@ -16,7 +16,7 @@ const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: R
 
 
 const CollaboratorsView: React.FC<CollaboratorsViewProps> = ({ project }) => {
-    const { members } = useAppContext();
+    const { state: { members } } = useAppContext();
     
     return (
         <section>

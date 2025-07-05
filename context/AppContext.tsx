@@ -1,178 +1,140 @@
-import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback } from 'react';
-import toast from 'react-hot-toast';
-import { FormData, Member, Task, Activity, Report, DirectExpense, NotificationType, AppContextType } from '../types';
 
-// Create the context with a default value (will be overridden by Provider)
+import React, { createContext, useReducer, useEffect, useContext, ReactNode, useCallback } from 'react';
+import toast from 'react-hot-toast';
+import { produce } from 'https://esm.sh/immer';
+import { AppState, Action, NotificationType, AppContextType } from '../types';
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// Create the Provider component
+const appReducer = (state: AppState, action: Action): AppState => {
+  switch (action.type) {
+    case 'SET_PROJECTS':
+      return produce(state, draft => { draft.projects = action.payload; });
+    case 'UPDATE_PROJECT_STATUS':
+      return produce(state, draft => {
+        const project = draft.projects.find(p => p.id === action.payload.projectId);
+        if (project) project.status = action.payload.status;
+      });
+    case 'DELETE_PROJECT':
+      return produce(state, draft => {
+        const tasksToDelete = draft.tasks.filter(t => t.projectId === action.payload);
+        const taskIdsToDelete = new Set(tasksToDelete.map(t => t.id));
+        draft.projects = draft.projects.filter(p => p.id !== action.payload);
+        draft.tasks = draft.tasks.filter(t => t.projectId !== action.payload);
+        draft.activities = draft.activities.filter(a => !taskIdsToDelete.has(a.taskId));
+        draft.directExpenses = draft.directExpenses.filter(d => d.projectId !== action.payload);
+        draft.reports = draft.reports.filter(r => r.projectId !== action.payload);
+      });
+    case 'SET_MEMBERS':
+      return produce(state, draft => { draft.members = action.payload; });
+    case 'DELETE_MEMBER':
+      return produce(state, draft => {
+        draft.members = draft.members.filter(m => m.id !== action.payload);
+        draft.projects.forEach(project => {
+            project.collaboratorDetails = project.collaboratorDetails.filter(c => c.memberId !== action.payload);
+        });
+        draft.tasks.forEach(task => {
+            if (task.assignedMemberId === action.payload) task.assignedMemberId = '';
+        });
+      });
+    case 'SET_TASKS':
+      return produce(state, draft => { draft.tasks = action.payload; });
+    case 'ADD_TASK':
+      return produce(state, draft => { draft.tasks.push(action.payload); });
+    case 'UPDATE_TASK':
+      return produce(state, draft => {
+        const index = draft.tasks.findIndex(t => t.id === action.payload.id);
+        if (index !== -1) draft.tasks[index] = action.payload;
+      });
+    case 'DELETE_TASK':
+      return produce(state, draft => {
+        draft.tasks = draft.tasks.filter(t => t.id !== action.payload);
+        draft.activities = draft.activities.filter(a => a.taskId !== action.payload);
+      });
+    case 'SET_ACTIVITIES':
+      return produce(state, draft => { draft.activities = action.payload; });
+    case 'ADD_ACTIVITIES':
+      return produce(state, draft => { draft.activities.push(...action.payload); });
+    case 'UPDATE_ACTIVITY':
+        return produce(state, draft => {
+            const index = draft.activities.findIndex(a => a.id === action.payload.id);
+            if (index !== -1) draft.activities[index] = action.payload;
+        });
+    case 'APPROVE_ACTIVITY':
+      return produce(state, draft => {
+        const activity = draft.activities.find(a => a.id === action.payload);
+        if (activity) {
+          activity.status = 'Approved';
+          activity.updatedAt = new Date().toISOString();
+        }
+      });
+    case 'DELETE_ACTIVITY':
+      return produce(state, draft => {
+        draft.activities = draft.activities.filter(a => a.id !== action.payload);
+      });
+    case 'SET_DIRECT_EXPENSES':
+      return produce(state, draft => { draft.directExpenses = action.payload; });
+    case 'ADD_DIRECT_EXPENSE':
+        return produce(state, draft => { draft.directExpenses.push(action.payload); });
+    case 'SET_REPORTS':
+      return produce(state, draft => { draft.reports = action.payload; });
+    case 'SET_REPORT_PROJECT_ID_TO_OPEN':
+      return produce(state, draft => { draft.reportProjectIdToOpen = action.payload; });
+    case 'CLEAR_ALL_DATA':
+      return { ...initialState, reportProjectIdToOpen: null };
+    case 'LOAD_DATA':
+        return { ...initialState, ...action.payload };
+    default:
+      return state;
+  }
+};
+
+const initialState: AppState = {
+  projects: [],
+  members: [],
+  tasks: [],
+  activities: [],
+  directExpenses: [],
+  reports: [],
+  reportProjectIdToOpen: null,
+};
+
+const initializer = (): AppState => {
+    try {
+        const savedState = localStorage.getItem('appState');
+        return savedState ? JSON.parse(savedState) : initialState;
+    } catch (e) {
+        console.error("Failed to parse state from localStorage", e);
+        return initialState;
+    }
+}
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [projects, setProjects] = useState<FormData[]>(() => {
-        try {
-          const saved = localStorage.getItem('projects');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse projects from localStorage", e);
-          return [];
-        }
-    });
-
-    const [members, setMembers] = useState<Member[]>(() => {
-        try {
-          const saved = localStorage.getItem('members');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse members from localStorage", e);
-          return [];
-        }
-    });
-    
-    const [tasks, setTasks] = useState<Task[]>(() => {
-        try {
-          const saved = localStorage.getItem('tasks');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse tasks from localStorage", e);
-          return [];
-        }
-    });
-
-    const [activities, setActivities] = useState<Activity[]>(() => {
-        try {
-          const saved = localStorage.getItem('activities');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse activities from localStorage", e);
-          return [];
-        }
-    });
-
-    const [directExpenses, setDirectExpenses] = useState<DirectExpense[]>(() => {
-        try {
-          const saved = localStorage.getItem('directExpenses');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse directExpenses from localStorage", e);
-          return [];
-        }
-    });
-
-    const [reports, setReports] = useState<Report[]>(() => {
-        try {
-          const saved = localStorage.getItem('reports');
-          return saved ? JSON.parse(saved) : [];
-        } catch (e) {
-          console.error("Failed to parse reports from localStorage", e);
-          return [];
-        }
-    });
-
-    const [reportProjectIdToOpen, setReportProjectIdToOpen] = useState<string | null>(null);
+    const [state, dispatch] = useReducer(appReducer, initialState, initializer);
 
     useEffect(() => {
         try {
-        localStorage.setItem('projects', JSON.stringify(projects));
+            localStorage.setItem('appState', JSON.stringify(state));
         } catch (e) {
-        console.error("Failed to save projects to localStorage", e);
+            console.error("Failed to save state to localStorage", e);
         }
-    }, [projects]);
-
-    useEffect(() => {
-        try {
-        localStorage.setItem('members', JSON.stringify(members));
-        } catch (e) {
-        console.error("Failed to save members to localStorage", e);
-        }
-    }, [members]);
-    
-    useEffect(() => {
-        try {
-        localStorage.setItem('tasks', JSON.stringify(tasks));
-        } catch (e) {
-        console.error("Failed to save tasks to localStorage", e);
-        }
-    }, [tasks]);
-
-    useEffect(() => {
-        try {
-        localStorage.setItem('activities', JSON.stringify(activities));
-        } catch (e) {
-        console.error("Failed to save activities to localStorage", e);
-        }
-    }, [activities]);
-
-    useEffect(() => {
-        try {
-        localStorage.setItem('directExpenses', JSON.stringify(directExpenses));
-        } catch (e) {
-        console.error("Failed to save directExpenses to localStorage", e);
-        }
-    }, [directExpenses]);
-
-    useEffect(() => {
-        try {
-        localStorage.setItem('reports', JSON.stringify(reports));
-        } catch (e) {
-        console.error("Failed to save reports to localStorage", e);
-        }
-    }, [reports]);
+    }, [state]);
 
     const notify = useCallback((message: string, type: NotificationType) => {
         switch (type) {
-            case 'success':
-                toast.success(message);
-                break;
-            case 'error':
-                toast.error(message);
-                break;
-            case 'info':
-                toast(message, { icon: 'ℹ️' });
-                break;
-            case 'warning':
-                toast(message, { icon: '⚠️' });
-                break;
-            default:
-                toast(message);
+            case 'success': toast.success(message); break;
+            case 'error': toast.error(message); break;
+            case 'info': toast(message, { icon: 'ℹ️' }); break;
+            case 'warning': toast(message, { icon: '⚠️' }); break;
+            default: toast(message);
         }
     }, []);
-    
-    const approveActivity = useCallback((activityId: string) => {
-        setActivities(prevActivities => 
-            prevActivities.map(a => 
-                a.id === activityId ? { ...a, status: 'Approved', updatedAt: new Date().toISOString() } : a
-            )
-        );
-        notify('Activity approved.', 'success');
-    }, [setActivities, notify]);
 
-    const clearAllData = useCallback(() => {
-        setProjects([]);
-        setMembers([]);
-        setTasks([]);
-        setActivities([]);
-        setDirectExpenses([]);
-        setReports([]);
-        notify('All application data has been cleared.', 'success');
-    }, [setProjects, setMembers, setTasks, setActivities, setDirectExpenses, setReports, notify]);
-
-    const value: AppContextType = {
-        projects, setProjects,
-        members, setMembers,
-        tasks, setTasks,
-        activities, setActivities,
-        directExpenses, setDirectExpenses,
-        reports, setReports,
-        notify,
-        approveActivity,
-        reportProjectIdToOpen,
-        setReportProjectIdToOpen,
-        clearAllData,
-    };
+    const value: AppContextType = { state, dispatch, notify };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
-// Create a custom hook for easy consumption
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
   if (context === undefined) {

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { FormData, ProjectStatus } from '../types';
 import { PROJECT_STATUS_OPTIONS } from '../constants';
@@ -17,10 +16,12 @@ const StatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
     const statusStyles: Record<ProjectStatus, string> = {
         'Active': 'bg-green-100 text-green-800',
         'On Hold': 'bg-yellow-100 text-yellow-800',
-        'Completed': 'bg-slate-100 text-slate-800',
+        'Completed': 'bg-blue-100 text-blue-800',
+        'Pending': 'bg-slate-100 text-slate-800',
+        'Terminated': 'bg-rose-100 text-rose-800',
     };
     return (
-        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusStyles[status]}`}>
+        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusStyles[status] || 'bg-slate-100 text-slate-800'}`}>
             {status}
         </span>
     );
@@ -78,8 +79,8 @@ const StatusDropdown: React.FC<{
 };
 
 const ProjectList: React.FC<ProjectListProps> = ({ projects, onAddProject, onEditProject, onDeleteProject, onViewProject, onUpdateProjectStatus }) => {
-  const activeAndOnHoldProjects = projects.filter(p => p.status !== 'Completed');
-  const completedProjects = projects.filter(p => p.status === 'Completed');
+  const activeAndOnHoldProjects = projects.filter(p => ['Pending', 'Active', 'On Hold'].includes(p.status));
+  const finishedProjects = projects.filter(p => ['Completed', 'Terminated'].includes(p.status));
 
   const renderProjectItem = (project: FormData) => (
      <li key={project.id} className={`py-4 px-2 flex flex-col sm:flex-row items-start sm:items-center justify-between hover:bg-slate-50 rounded-md -mx-2 transition-all duration-200 ${project.status === 'On Hold' ? 'opacity-70' : ''}`}>
@@ -154,15 +155,15 @@ const ProjectList: React.FC<ProjectListProps> = ({ projects, onAddProject, onEdi
                 <p className="text-slate-500 italic py-4">No active projects.</p>
             )}
 
-            {completedProjects.length > 0 && (
+            {finishedProjects.length > 0 && (
                 <details className="mt-8">
                     <summary className="text-xl font-bold text-slate-700 cursor-pointer list-none flex items-center gap-2">
                         <i className="fa-solid fa-chevron-right transition-transform duration-200"></i>
-                        Archived ({completedProjects.length})
+                        Finished Projects ({finishedProjects.length})
                     </summary>
                     <div className="mt-2 border-t pt-2">
                         <ul className="divide-y divide-slate-200">
-                            {completedProjects.map(renderProjectItem)}
+                            {finishedProjects.map(renderProjectItem)}
                         </ul>
                     </div>
                 </details>

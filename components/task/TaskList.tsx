@@ -31,15 +31,15 @@ const TaskCard: React.FC<{
   task: Task;
   onEditTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
-  getProjectTitle: (id: string) => string;
+  projectMap: Map<string, string>;
   assigneeName: string;
-}> = ({ task, onEditTask, onDeleteTask, getProjectTitle, assigneeName }) => (
+}> = ({ task, onEditTask, onDeleteTask, projectMap, assigneeName }) => (
     <div className={`bg-white p-4 rounded-lg border shadow-sm ${isTaskOverdue(task) ? 'border-red-300' : 'border-slate-200'}`}>
         <div className="flex justify-between items-start">
             <p className="font-bold text-slate-800 pr-2">{task.title}</p>
             <span className="font-mono text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded flex-shrink-0">{task.taskCode}</span>
         </div>
-        <p className="text-xs text-slate-500 mt-1 mb-3">{getProjectTitle(task.projectId)}</p>
+        <p className="text-xs text-slate-500 mt-1 mb-3">{projectMap.get(task.projectId) || 'N/A'}</p>
         <p className="text-sm text-slate-600 mb-4 h-10 overflow-hidden">{task.description}</p>
         <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500">Due: <span className={isTaskOverdue(task) ? "font-bold text-red-600" : "font-medium text-slate-700"}>{task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</span></span>
@@ -53,7 +53,7 @@ const TaskCard: React.FC<{
 );
 
 const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDeleteTask, onToggleTaskComplete, selectedProjectId }) => {
-  const { projects, members } = useAppContext();
+  const { state: { projects, members } } = useAppContext();
   const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
   const [filterMember, setFilterMember] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -63,20 +63,18 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDel
   const [recentlyUpdatedTaskId, setRecentlyUpdatedTaskId] = useState<string | null>(null);
 
   const memberMap = useMemo(() => new Map(members.map(m => [m.id, `${m.firstName} ${m.lastName}`])), [members]);
-  const getProjectTitle = useMemo(() => {
-    const projectMap = new Map(projects.map(p => [p.id, p.projectTitle]));
-    return (id: string) => projectMap.get(id) || 'N/A';
-  }, [projects]);
+  const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectTitle])), [projects]);
 
   const sortedAndFilteredTasks = useMemo(() => {
     let filtered = tasks.filter(task => {
         const projectMatch = !selectedProjectId || task.projectId === selectedProjectId;
         const memberMatch = !filterMember || task.assignedMemberId === filterMember;
+        const projectName = projectMap.get(task.projectId) || '';
         const searchMatch = !searchTerm || 
             task.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
             task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (task.taskCode && task.taskCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            getProjectTitle(task.projectId).toLowerCase().includes(searchTerm.toLowerCase());
+            projectName.toLowerCase().includes(searchTerm.toLowerCase());
         
         const now = new Date();
         const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -107,7 +105,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDel
         }
         return sortDirection === 'asc' ? comparison : -comparison;
     });
-  }, [tasks, selectedProjectId, filterMember, searchTerm, getProjectTitle, sortOption, sortDirection, filterStatus, memberMap]);
+  }, [tasks, selectedProjectId, filterMember, searchTerm, projectMap, sortOption, sortDirection, filterStatus, memberMap]);
 
   const tasksByStatus = useMemo(() => {
     return sortedAndFilteredTasks.reduce((acc, task) => {
@@ -210,7 +208,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDel
                                           <div className="text-xs font-bold bg-slate-200 text-slate-600 rounded-md px-2 py-1">{task.taskCode || 'N/A'}</div>
                                           <div>
                                               <div className="text-sm font-medium text-slate-900">{task.title}</div>
-                                              <div className="text-sm text-slate-500">{getProjectTitle(task.projectId)}</div>
+                                              <div className="text-sm text-slate-500">{projectMap.get(task.projectId) || 'N/A'}</div>
                                           </div>
                                       </div>
                                   </td>
@@ -222,7 +220,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDel
                                                       <img className="h-8 w-8 rounded-full object-cover" src={members.find(m=>m.id === task.assignedMemberId)?.imageUrl || `https://ui-avatars.com/api/?name=${memberMap.get(task.assignedMemberId)}&background=random`} alt="" />
                                                   </div>
                                                   <div className="ml-3">
-                                                      <div className="text-sm font-medium text-slate-900">{memberMap.get(task.assignedMemberId)}</div>
+                                                      <div className="text-sm font-medium text-slate-900">{memberMap.get(task.assignedMemberId) || 'Unassigned'}</div>
                                                   </div>
                                               </>
                                           ) : <div className="text-sm text-slate-500">Unassigned</div>}
@@ -266,7 +264,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, onAddTask, onEditTask, onDel
                                 task={task}
                                 onEditTask={onEditTask}
                                 onDeleteTask={onDeleteTask}
-                                getProjectTitle={getProjectTitle}
+                                projectMap={projectMap}
                                 assigneeName={memberMap.get(task.assignedMemberId) || 'Unassigned'}
                             />
                         ))}

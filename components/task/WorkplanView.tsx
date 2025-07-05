@@ -84,7 +84,15 @@ const CategorySection: React.FC<{
                     <div className="text-xl font-bold text-slate-700">{formatCurrency(budgeted)}</div>
                 </div>
                 <div>
-                    <div className="text-xs text-slate-500 uppercase tracking-wider">Actual Paid</div>
+                    <div className="text-xs text-slate-500 uppercase tracking-wider flex items-center justify-center gap-1">
+                        <span>Actual Paid</span>
+                        <div className="relative group">
+                            <i className="fa-solid fa-circle-info text-slate-400 cursor-help"></i>
+                            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-slate-700 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center">
+                                Actuals include the value of 'Approved' time logs for tasks in this category. Direct expenses are not included in this workplan view.
+                            </span>
+                        </div>
+                    </div>
                     <div className="text-xl font-bold text-blue-600">{formatCurrency(actualPaid)}</div>
                 </div>
                 <div>
@@ -185,7 +193,7 @@ const CategorySection: React.FC<{
 
 
 const WorkplanView: React.FC<WorkplanViewProps> = ({ selectedProjectId }) => {
-    const { tasks, projects, members, activities } = useAppContext();
+    const { state: { tasks, projects, members, activities } } = useAppContext();
     
     const expenseCategories = Object.entries(EXPENSE_FIELDS).map(([key, fields]) => {
         const title = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());

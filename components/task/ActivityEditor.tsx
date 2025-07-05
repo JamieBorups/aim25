@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Activity } from '../../types';
 import FormField from '../ui/FormField';
@@ -15,7 +16,7 @@ interface ActivityEditorProps {
 }
 
 const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCancel, selectedProjectId }) => {
-  const { tasks, members, projects } = useAppContext();
+  const { state: { tasks, members, projects } } = useAppContext();
   
   const getInitialProjectId = () => {
     if (activity.taskId) {
@@ -138,7 +139,7 @@ const ActivityEditor: React.FC<ActivityEditorProps> = ({ activity, onSave, onCan
                         disabled={isEditing}
                     />
                 </FormField>
-                <FormField label="Task" htmlFor="task" required>
+                <FormField label="Task" htmlFor="task" required instructions="Note: Only Time-Based tasks are shown. Milestones cannot have time logged against them.">
                     <Select 
                         id="task" 
                         value={formData.taskId} 

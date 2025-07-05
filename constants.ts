@@ -1,3 +1,4 @@
+
 import { FormData, Tab, DetailedBudget, Member, Task, TaskStatus, WorkType, Activity, Report, TaskType, ProjectStatus, BudgetItemStatus, TaskSortOption, TaskStatusFilter, ActivitySortOption, ActivityStatusFilter, DateRangeFilter } from './types';
 
 export const TABS: Tab[] = [
@@ -27,7 +28,7 @@ export const initialBudget: DetailedBudget = {
 export const initialFormData: FormData = {
   id: '',
   projectTitle: '',
-  status: 'Active',
+  status: 'Pending',
   artisticDisciplines: [],
   craftGenres: [],
   danceGenres: [],
@@ -397,9 +398,11 @@ export const ACTIVITY_TYPES = [
 ];
 
 export const PROJECT_STATUS_OPTIONS: { value: ProjectStatus, label: string }[] = [
-    { value: 'Active', label: 'Set as Active' },
-    { value: 'On Hold', label: 'Set as On Hold' },
-    { value: 'Completed', label: 'Mark as Completed' },
+    { value: 'Pending', label: 'Pending' },
+    { value: 'Active', label: 'Active' },
+    { value: 'On Hold', label: 'On Hold' },
+    { value: 'Completed', label: 'Completed' },
+    { value: 'Terminated', label: 'Terminated' },
 ];
 
 export const DATE_RANGE_FILTER_OPTIONS: { value: DateRangeFilter, label: string }[] = [

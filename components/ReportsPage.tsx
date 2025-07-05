@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { produce } from 'https://esm.sh/immer';
 import { FormData, Member, Task, Report, ReportHighlight, Activity, DirectExpense } from '../types';
@@ -76,7 +77,8 @@ const ReportField: React.FC<{ label?: string, instructions?: React.ReactNode, ch
 );
 
 const ReportsPage: React.FC = () => {
-  const { projects, members, tasks, activities, directExpenses, reports, setReports, notify, reportProjectIdToOpen, setReportProjectIdToOpen } = useAppContext();
+  const { state, dispatch, notify } = useAppContext();
+  const { projects, members, tasks, activities, directExpenses, reports, reportProjectIdToOpen } = state;
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
   const [reportData, setReportData] = useState<Report | null>(null);
@@ -122,9 +124,9 @@ const ReportsPage: React.FC = () => {
   useEffect(() => {
     if (reportProjectIdToOpen) {
         setSelectedProjectId(reportProjectIdToOpen);
-        setReportProjectIdToOpen(null); // Reset after use
+        dispatch({ type: 'SET_REPORT_PROJECT_ID_TO_OPEN', payload: null }); // Reset after use
     }
-  }, [reportProjectIdToOpen, setReportProjectIdToOpen]);
+  }, [reportProjectIdToOpen, dispatch]);
 
   useEffect(() => {
     if (!selectedProjectId || !selectedProject) {
@@ -162,17 +164,12 @@ const ReportsPage: React.FC = () => {
 
   const handleSave = () => {
       if (!tempReportData) return;
-      setReportData(tempReportData);
-      setReports(prevReports => {
-          const index = prevReports.findIndex(r => r.id === tempReportData.id);
-          if (index > -1) {
-              const newReports = [...prevReports];
-              newReports[index] = tempReportData;
-              return newReports;
-          } else {
-              return [...prevReports, tempReportData];
-          }
-      });
+      const reportsPayload = state.reports.some(r => r.id === tempReportData.id)
+        ? state.reports.map(r => r.id === tempReportData.id ? tempReportData : r)
+        : [...state.reports, tempReportData];
+      
+      dispatch({ type: 'SET_REPORTS', payload: reportsPayload });
+      
       setIsEditing(false);
       setTempReportData(null);
       notify('Report saved successfully!', 'success');
@@ -230,206 +227,137 @@ const ReportsPage: React.FC = () => {
             PEOPLE_INVOLVED_OPTIONS,
             GRANT_ACTIVITIES_OPTIONS,
         });
-        notify('PDF generation complete!', 'success');
     } catch (error) {
-        console.error("PDF Generation failed:", error);
-        notify('Failed to generate PDF. See console for details.', 'error');
+        console.error("Failed to generate PDF:", error);
+        notify("An error occurred while generating the PDF. Please try again.", 'error');
     } finally {
         setIsGeneratingPdf(false);
     }
   };
 
-  const dataForDisplay = isEditing ? tempReportData : reportData;
+  const completedProjects = useMemo(() => projects.filter(p => p.status === 'Completed'), [projects]);
 
-  const renderContent = () => {
-    if (!selectedProject) {
-      return <div className="text-center text-slate-500 py-10">Please select a project to view its report.</div>;
-    }
-    if (!dataForDisplay) {
-      return <div className="text-center text-slate-500 py-10">Loading report data...</div>;
-    }
-    
-    return (
-        <div ref={reportContentRef} className="bg-white p-4 sm:p-6">
-            <ReportSection title="Project Information">
-                <ReportField label="Describe the project and its results" disabled={!isEditing}>
-                    <TextareaWithCounter
-                        id="projectResults"
-                        rows={8}
-                        value={dataForDisplay.projectResults || ''}
-                        onChange={e => handleTempReportChange('projectResults', e.target.value)}
-                        wordLimit={500}
-                    />
-                </ReportField>
-                <div className="pl-4 border-l-4 border-slate-200">
-                    <ProjectInfoView project={selectedProject} hideTitle={true} />
-                </div>
-            </ReportSection>
-            
-            <ReportSection title="Collaborators">
-                 <CollaboratorsView project={selectedProject} />
-            </ReportSection>
-            
-            <ReportSection title="Budget Report">
-                <ReportField label="Describe how you spent the grant" disabled={!isEditing}>
-                     <TextareaWithCounter
-                        id="grantSpendingDescription"
-                        rows={5}
-                        value={dataForDisplay.grantSpendingDescription || ''}
-                        onChange={e => handleTempReportChange('grantSpendingDescription', e.target.value)}
-                        wordLimit={300}
-                    />
-                </ReportField>
-                <ReportBudgetView project={selectedProject} actuals={actuals} />
-            </ReportSection>
-
-            <ReportSection title="Workplan">
-                <ReportField label="Were any adjustments made to the workplan?" disabled={!isEditing}>
-                    <TextareaWithCounter
-                        id="workplanAdjustments"
-                        rows={3}
-                        value={dataForDisplay.workplanAdjustments || ''}
-                        onChange={e => handleTempReportChange('workplanAdjustments', e.target.value)}
-                        wordLimit={150}
-                    />
-                 </ReportField>
-                 <div className="overflow-x-auto border border-slate-200 rounded-lg mt-4">
-                    <table className="min-w-full divide-y divide-slate-200">
-                        <thead className="bg-slate-100">
-                             <tr>
-                                <th scope="col" className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Task</th>
-                                <th scope="col" className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Assignee</th>
-                                <th scope="col" className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                                <th scope="col" className="px-4 py-2 text-left text-xs font-bold text-slate-600 uppercase tracking-wider">Due Date</th>
-                             </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-slate-200">
-                            {projectTasks.map(task => (
-                                <tr key={task.id}>
-                                    <td className="px-4 py-2 text-sm font-medium text-slate-800">{task.title}</td>
-                                    <td className="px-4 py-2 text-sm text-slate-600">{members.find(m=>m.id === task.assignedMemberId)?.firstName || 'Unassigned'}</td>
-                                    <td className="px-4 py-2 text-sm text-slate-600">{task.status}</td>
-                                    <td className="px-4 py-2 text-sm text-slate-600">{task.dueDate}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                 </div>
-            </ReportSection>
-
-            <ReportSection title="Final Report: Reach">
-                 <ReportField label="Indicate whether the activities funded by this grant actively involved individuals (other than yourself) who identify as ..." disabled={!isEditing}>
-                    <CheckboxGroup
-                        name="involvedPeople"
-                        options={PEOPLE_INVOLVED_OPTIONS}
-                        selectedValues={dataForDisplay.involvedPeople || []}
-                        onChange={(values) => handleTempReportChange('involvedPeople', values)}
-                        columns={2}
-                    />
-                 </ReportField>
-                 <ReportField label="Indicate if the activities supported by this grant involved ..." disabled={!isEditing}>
-                    <CheckboxGroup
-                        name="involvedActivities"
-                        options={GRANT_ACTIVITIES_OPTIONS}
-                        selectedValues={dataForDisplay.involvedActivities || []}
-                        onChange={(values) => handleTempReportChange('involvedActivities', values)}
-                        columns={2}
-                    />
-                 </ReportField>
-            </ReportSection>
-            
-            <ReportSection title="Final Report: Impact">
-                {IMPACT_QUESTIONS.map(q => (
-                    <ReportField key={q.id} label={q.label} instructions={q.instructions} disabled={!isEditing}>
-                        <RadioGroup
-                            name={q.id}
-                            options={IMPACT_OPTIONS}
-                            selectedValue={dataForDisplay.impactStatements[q.id] || ''}
-                            onChange={(value) => handleImpactChange(q.id, value)}
-                        />
-                    </ReportField>
-                ))}
-            </ReportSection>
-
-            <ReportSection title="Additional Information and Assets" className="mt-12">
-                 <ReportField label="Share highlights of your project (articles, videos, etc.)" disabled={!isEditing}>
-                    <div className="space-y-2 border-b border-slate-200 pb-3 mb-3">
-                         {(dataForDisplay.highlights || []).map(highlight => (
-                             <div key={highlight.id} className="grid grid-cols-12 gap-2 items-center">
-                                <div className="col-span-5">
-                                    <Input 
-                                        type="text" 
-                                        placeholder="Title"
-                                        aria-label="Highlight Title"
-                                        value={highlight.title}
-                                        onChange={(e) => handleHighlightChange(highlight.id, 'title', e.target.value)}
-                                    />
-                                </div>
-                                <div className="col-span-6">
-                                    <Input 
-                                        type="url"
-                                        placeholder="https://example.com"
-                                        aria-label="Highlight URL"
-                                        value={highlight.url}
-                                        onChange={(e) => handleHighlightChange(highlight.id, 'url', e.target.value)}
-                                    />
-                                </div>
-                                <div className="col-span-1 text-right">
-                                     <button type="button" onClick={() => handleRemoveHighlight(highlight.id)} className="text-slate-400 hover:text-red-600 p-2 rounded-full hover:bg-red-100 transition-colors" aria-label="Remove Highlight">
-                                        <i className="fa-solid fa-trash-alt fa-fw"></i>
-                                    </button>
-                                </div>
-                             </div>
-                         ))}
-                     </div>
-                     <button type="button" onClick={handleAddHighlight} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-md shadow-sm hover:bg-teal-700">
-                        <i className="fa fa-plus mr-2"></i>Add Link
-                     </button>
-                 </ReportField>
-            </ReportSection>
-        </div>
-    );
-  };
-  
   return (
-    <div className="bg-white shadow-lg rounded-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-slate-200 pb-4 gap-4 p-6">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-900">Final Report Generator</h1>
-                <p className="text-slate-500 mt-1">Select a project to view, edit, or generate its final report.</p>
+    <div className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
+        <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+            <h1 className="text-3xl font-bold text-slate-900">Final Reports</h1>
+            <div className="w-full max-w-sm">
+                <FormField label="Select a Completed Project to View/Edit Report" htmlFor="report_project_select" className="mb-0">
+                    <Select
+                        id="report_project_select"
+                        value={selectedProjectId}
+                        onChange={e => setSelectedProjectId(e.target.value)}
+                        options={[
+                            { value: '', label: 'Select a project...' },
+                            ...completedProjects.map(p => ({ value: p.id, label: p.projectTitle }))
+                        ]}
+                    />
+                </FormField>
             </div>
-            <div className="w-full md:w-auto flex-shrink-0 flex items-center gap-4">
-                <div className="w-full md:w-64">
-                     <FormField label="Select Project" htmlFor="project_filter" className="mb-0">
-                        <Select id="project_filter" value={selectedProjectId} onChange={e => setSelectedProjectId(e.target.value)} options={[{ value: '', label: 'Select a Project' }, ...projects.map(p => ({ value: p.id, label: p.projectTitle }))]} />
-                    </FormField>
-                </div>
-                {reportData && (
-                    <div className="mt-5 flex items-center gap-2">
-                        {!isEditing ? (
+        </div>
+
+        {!selectedProject ? (
+            <div className="text-center py-20">
+                <i className="fa-solid fa-file-invoice text-7xl text-slate-300"></i>
+                <h3 className="mt-6 text-xl font-medium text-slate-800">No Project Selected</h3>
+                <p className="text-slate-500 mt-2 text-base">Please select a completed project from the dropdown above to view its final report.</p>
+            </div>
+        ) : !reportData ? (
+             <div className="text-center py-20">
+                <i className="fa-solid fa-spinner fa-spin text-7xl text-slate-300"></i>
+                <h3 className="mt-6 text-xl font-medium text-slate-800">Loading Report...</h3>
+            </div>
+        ) : (
+            <div>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-2xl font-bold text-teal-700">{selectedProject.projectTitle}</h2>
+                    <div className="flex items-center gap-3">
+                        {isEditing ? (
                             <>
-                            <button onClick={handleEdit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700">
-                                <i className="fa-solid fa-pencil mr-2"></i>Edit
-                            </button>
-                             <button onClick={handleGeneratePdf} disabled={isGeneratingPdf} className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md shadow-sm hover:bg-green-700 disabled:bg-slate-400">
-                                <i className={`mr-2 ${isGeneratingPdf ? 'fa fa-spinner fa-spin' : 'fa fa-file-pdf'}`}></i>
-                                {isGeneratingPdf ? 'Generating...' : 'Generate PDF'}
-                            </button>
+                                <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-100">Cancel</button>
+                                <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-md shadow-sm hover:bg-teal-700">Save Report</button>
                             </>
                         ) : (
                             <>
-                                <button onClick={handleCancel} className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 rounded-md hover:bg-slate-200">Cancel</button>
-                                <button onClick={handleSave} className="px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-md shadow-sm hover:bg-teal-700">
-                                    <i className="fa fa-save mr-2"></i>Save
+                                <button onClick={handleEdit} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700">
+                                    <i className="fa-solid fa-pencil mr-2"></i>Edit Report
+                                </button>
+                                <button onClick={handleGeneratePdf} disabled={isGeneratingPdf} className="px-4 py-2 text-sm font-medium text-white bg-rose-600 rounded-md shadow-sm hover:bg-rose-700 disabled:bg-slate-400">
+                                    <i className={`fa-solid ${isGeneratingPdf ? 'fa-spinner fa-spin' : 'fa-file-pdf'} mr-2`}></i>
+                                    {isGeneratingPdf ? 'Generating...' : 'Generate PDF'}
                                 </button>
                             </>
                         )}
                     </div>
-                )}
+                </div>
+
+                <div ref={reportContentRef}>
+                    <ReportSection title="Project Description">
+                        <ReportField label="Briefly describe the project and its results.">
+                            <TextareaWithCounter wordLimit={750} rows={10} value={isEditing ? tempReportData?.projectResults : reportData.projectResults} onChange={e => handleTempReportChange('projectResults', e.target.value)} disabled={!isEditing} />
+                        </ReportField>
+                    </ReportSection>
+                    
+                    <ReportSection title="Financial Report">
+                        <ReportField label="Briefly describe how you spent the grant.">
+                             <TextareaWithCounter wordLimit={300} rows={5} value={isEditing ? tempReportData?.grantSpendingDescription : reportData.grantSpendingDescription} onChange={e => handleTempReportChange('grantSpendingDescription', e.target.value)} disabled={!isEditing} />
+                        </ReportField>
+                        <ReportBudgetView project={selectedProject} actuals={actuals} />
+                    </ReportSection>
+
+                    <ReportSection title="Workplan">
+                         <ReportField label="Were any adjustments made to the workplan?">
+                             <TextareaWithCounter wordLimit={200} rows={4} value={isEditing ? tempReportData?.workplanAdjustments : reportData.workplanAdjustments} onChange={e => handleTempReportChange('workplanAdjustments', e.target.value)} disabled={!isEditing} />
+                        </ReportField>
+                    </ReportSection>
+
+                    <ReportSection title="Community Reach">
+                        <ReportField label="My activities actively involved individuals who identify as:" instructions="Select all that apply.">
+                            <CheckboxGroup name="involvedPeople" options={PEOPLE_INVOLVED_OPTIONS} selectedValues={isEditing ? tempReportData?.involvedPeople || [] : reportData.involvedPeople} onChange={value => handleTempReportChange('involvedPeople', value)} columns={2} />
+                        </ReportField>
+                         <ReportField label="The activities supported by this grant involved:" instructions="Select all that apply.">
+                            <CheckboxGroup name="involvedActivities" options={GRANT_ACTIVITIES_OPTIONS} selectedValues={isEditing ? tempReportData?.involvedActivities || [] : reportData.involvedActivities} onChange={value => handleTempReportChange('involvedActivities', value)} columns={2} />
+                        </ReportField>
+                    </ReportSection>
+
+                    <ReportSection title="Impact Assessment">
+                        {IMPACT_QUESTIONS.map(q => (
+                            <ReportField key={q.id} label={q.label} instructions={q.instructions}>
+                                <RadioGroup
+                                    name={q.id}
+                                    options={IMPACT_OPTIONS}
+                                    selectedValue={isEditing ? tempReportData?.impactStatements[q.id] || '' : reportData.impactStatements[q.id] || ''}
+                                    onChange={value => handleImpactChange(q.id, value)}
+                                />
+                            </ReportField>
+                        ))}
+                    </ReportSection>
+                    
+                    <ReportSection title="Closing">
+                        <ReportField label="Project Highlights" instructions="Provide links to documentation of your project (e.g., photos, videos, press).">
+                           <div className="space-y-3">
+                                {(isEditing ? tempReportData?.highlights : reportData.highlights)?.map(highlight => (
+                                    <div key={highlight.id} className="grid grid-cols-12 gap-3 items-center">
+                                        <Input className="col-span-5" placeholder="Title (e.g., Photo Gallery)" value={highlight.title} onChange={e => handleHighlightChange(highlight.id, 'title', e.target.value)} disabled={!isEditing} />
+                                        <Input className="col-span-6" placeholder="URL (e.g., https://...)" value={highlight.url} onChange={e => handleHighlightChange(highlight.id, 'url', e.target.value)} disabled={!isEditing} />
+                                        <button onClick={() => handleRemoveHighlight(highlight.id)} disabled={!isEditing} className="col-span-1 text-red-500 hover:text-red-700 disabled:text-slate-300"><i className="fa-solid fa-trash-alt"></i></button>
+                                    </div>
+                                ))}
+                                {isEditing && <button type="button" onClick={handleAddHighlight} className="px-3 py-1.5 text-xs font-medium text-white bg-teal-600 rounded-md shadow-sm hover:bg-teal-700">+ Add Highlight</button>}
+                           </div>
+                        </ReportField>
+                        
+                        <ReportField label="What worked well with the grant program and what could be improved?">
+                            <TextareaWithCounter wordLimit={250} rows={4} value={isEditing ? tempReportData?.feedback : reportData.feedback} onChange={e => handleTempReportChange('feedback', e.target.value)} disabled={!isEditing} />
+                        </ReportField>
+                        
+                        <ReportField label="Is there anything else you would like to share?">
+                            <TextareaWithCounter wordLimit={250} rows={4} value={isEditing ? tempReportData?.additionalFeedback : reportData.additionalFeedback} onChange={e => handleTempReportChange('additionalFeedback', e.target.value)} disabled={!isEditing} />
+                        </ReportField>
+                    </ReportSection>
+                </div>
             </div>
-        </div>
-        
-        {renderContent()}
+        )}
     </div>
   );
 };

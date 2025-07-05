@@ -12,7 +12,7 @@ interface Props {
 }
 
 const CollaboratorsTab: React.FC<Props> = ({ formData, onChange }) => {
-    const { members } = useAppContext();
+    const { state: { members } } = useAppContext();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedMemberId, setSelectedMemberId] = useState('');
     const [role, setRole] = useState('');

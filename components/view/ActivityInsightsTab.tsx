@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { FormData, Activity, DirectExpense, DateRangeFilter, Member, Task } from '../../types';
 import { useAppContext } from '../../context/AppContext';
@@ -32,7 +33,7 @@ const ProgressBar: React.FC<{ value: number; max: number; color?: string; height
 };
 
 const ActivityInsightsTab: React.FC<ActivityInsightsTabProps> = ({ project }) => {
-    const { activities, directExpenses, members, tasks } = useAppContext();
+    const { state: { activities, directExpenses, members, tasks } } = useAppContext();
     const [dateRange, setDateRange] = useState<DateRangeFilter>('all');
     
     const memberMap = useMemo(() => new Map(members.map(m => [m.id, m])), [members]);
@@ -205,6 +206,7 @@ const ActivityInsightsTab: React.FC<ActivityInsightsTabProps> = ({ project }) =>
                                             const task = taskMap.get(feedItem.item.taskId);
                                             const isPaid = task?.workType === 'Paid';
                                             const cost = isPaid ? feedItem.item.hours * (task?.hourlyRate || 0) : 0;
+                                            const member = memberMap.get(feedItem.item.memberId);
                                             return (
                                                 <>
                                                     <div className="flex justify-between items-center">
@@ -215,7 +217,7 @@ const ActivityInsightsTab: React.FC<ActivityInsightsTabProps> = ({ project }) =>
                                                         </span>
                                                     </div>
                                                     <p className="text-sm text-slate-600">{feedItem.item.description}</p>
-                                                    <p className="text-xs text-slate-400 mt-1">Logged by: {memberMap.get(feedItem.item.memberId)?.firstName}</p>
+                                                    <p className="text-xs text-slate-400 mt-1">Logged by: {member?.firstName}</p>
                                                 </>
                                             )
                                         })() : (

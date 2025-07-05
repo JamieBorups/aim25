@@ -14,7 +14,7 @@ interface ProjectViewerProps {
 }
 
 const ProjectViewer: React.FC<ProjectViewerProps> = ({ project, onBack, onSave }) => {
-    const { tasks, activities, directExpenses } = useAppContext();
+    const { state: { tasks, activities, directExpenses } } = useAppContext();
     const [activeTab, setActiveTab] = useState<ProjectViewTabId>('info');
 
     const projectTasks = useMemo(() => tasks.filter(t => t.projectId === project.id), [tasks, project.id]);

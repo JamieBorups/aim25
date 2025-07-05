@@ -74,7 +74,7 @@ const isTaskOverdue = (task: Task) => !task.isComplete && task.dueDate && new Da
 // --- Main Component ---
 
 const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
-    const { projects, tasks, activities } = useAppContext();
+    const { state: { projects, tasks, activities } } = useAppContext();
     const [activeTab, setActiveTab] = useState<MemberViewTabId>('profile');
     const [openProjects, setOpenProjects] = useState<Set<string>>(new Set());
 
@@ -89,7 +89,9 @@ const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
         const totalHoursAllTime = approvedActivities.reduce((sum, a) => sum + (a.hours || 0), 0);
 
         const memberProjectIds = new Set(projects.filter(p => p.collaboratorDetails.some(c => c.memberId === member.id)).map(p => p.id));
-        const totalActiveProjects = projects.filter(p => p.status === 'Active' && memberProjectIds.has(p.id)).length;
+        
+        const totalOngoingProjects = projects.filter(p => ['Pending', 'Active', 'On Hold'].includes(p.status) && memberProjectIds.has(p.id)).length;
+        const totalCompletedProjects = projects.filter(p => ['Completed', 'Terminated'].includes(p.status) && memberProjectIds.has(p.id)).length;
         
         const totalCompletedTasks = tasks.filter(t => t.assignedMemberId === member.id && t.status === 'Done').length;
 
@@ -104,7 +106,8 @@ const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
         
         return {
             totalHoursAllTime,
-            totalActiveProjects,
+            totalOngoingProjects,
+            totalCompletedProjects,
             totalCompletedTasks,
             hoursByProject: Array.from(hoursByProject.entries()).map(([projectId, hours]) => ({
                 projectId,
@@ -179,20 +182,134 @@ const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
     const renderTabContent = () => {
         switch (activeTab) {
             case 'profile':
+                const activeProjects = projectsWithDetails.filter(p => ['Pending', 'Active', 'On Hold'].includes(p.project.status));
+                const completedProjects = projectsWithDetails.filter(p => ['Completed', 'Terminated'].includes(p.project.status));
+
+                const renderProjectList = (projectList: ProjectWithDetails[]) => (
+                    <div className="mt-2 space-y-3">
+                        {projectList.map(details => {
+                            const isExpanded = openProjects.has(details.project.id);
+                            return (
+                                <div key={details.project.id} className="bg-slate-50 border border-slate-200 rounded-lg">
+                                    <button
+                                        onClick={() => toggleProject(details.project.id)}
+                                        className="w-full text-left p-3 flex flex-col gap-3 hover:bg-slate-100 rounded-t-lg transition-colors duration-150"
+                                        aria-expanded={isExpanded}
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <span className="font-semibold text-slate-800">{details.project.projectTitle}</span>
+                                                {details.role && <span className="text-slate-500 text-sm"> as {details.role}</span>}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2.5 py-1 text-xs font-semibold text-teal-800 bg-teal-100 rounded-full">{details.tasks.length} Task{details.tasks.length !== 1 ? 's' : ''}</span>
+                                                <i className={`fa-solid fa-chevron-down text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3 text-center">
+                                            <div className="bg-white p-2 rounded-md border border-slate-200">
+                                                <div className="text-xs text-slate-500 font-semibold">Task Progress</div>
+                                                <div className="text-sm font-bold text-slate-700 mt-1">{details.completedTasks} / {details.tasks.length} Done</div>
+                                            </div>
+                                            <div className="bg-white p-2 rounded-md border border-slate-200">
+                                                <div className="text-xs text-slate-500 font-semibold">Total Paid</div>
+                                                <div className="text-sm font-bold text-blue-600 mt-1">{formatCurrency(details.totalPaidValue)}</div>
+                                            </div>
+                                            <div className="bg-white p-2 rounded-md border border-slate-200">
+                                                <div className="text-xs text-slate-500 font-semibold">In-Kind Value</div>
+                                                <div className="text-sm font-bold text-purple-600 mt-1">{formatCurrency(details.totalInKindValue)}</div>
+                                            </div>
+                                        </div>
+                                    </button>
+                                    
+                                    {isExpanded && (
+                                        <div className="border-t border-slate-200 bg-white p-3 space-y-3">
+                                            {details.tasks.length > 0 ? details.tasks.map(task => (
+                                                <div key={task.id} className="bg-white border border-slate-200 rounded-md p-3">
+                                                    {/* Task Header */}
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <h4 className="font-bold text-slate-800">{task.title}</h4>
+                                                        <div className="flex-shrink-0 flex items-center gap-2">
+                                                            <TaskStatusBadge status={task.status} />
+                                                            <span className="font-mono text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{task.taskCode}</span>
+                                                        </div>
+                                                    </div>
+                                                    <p className={`text-xs mt-1 ${isTaskOverdue(task) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</p>
+                                                    <p className="text-sm text-slate-600 my-2">{task.description}</p>
+                                                    
+                                                    {/* Hours Progress */}
+                                                    {task.taskType === 'Time-Based' && (
+                                                        <div className="my-3">
+                                                            <div className="flex justify-between text-xs font-medium text-slate-600 mb-1">
+                                                                <span>Hours Logged</span>
+                                                                <span>{task.loggedHours.toFixed(1)} / {task.estimatedHours}h</span>
+                                                            </div>
+                                                            <ProgressBar value={task.loggedHours} max={task.estimatedHours} />
+                                                        </div>
+                                                    )}
+                                                    
+                                                    {/* Activity Log */}
+                                                    {task.activities.length > 0 && (
+                                                        <div className="mt-3">
+                                                            <h5 className="text-xs font-semibold text-slate-500 mb-1">Approved Activity Logs:</h5>
+                                                            <table className="min-w-full text-xs">
+                                                                <tbody className="divide-y divide-slate-100">
+                                                                    {task.activities.map(activity => (
+                                                                        <tr key={activity.id}>
+                                                                            <td className="py-1.5 pr-2 w-full">{activity.description}</td>
+                                                                            <td className="py-1.5 px-2 whitespace-nowrap">{new Date(activity.endDate).toLocaleDateString()}</td>
+                                                                            <td className="py-1.5 px-2 whitespace-nowrap font-bold">{activity.hours}h</td>
+                                                                            <td className="py-1.5 pl-2 text-right"><WorkTypeBadge type={activity.workType} /></td>
+                                                                        </tr>
+                                                                    ))}
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )) : <p className="text-slate-500 italic text-center py-4">No tasks assigned for this project.</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                );
+
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                        <div className="md:col-span-1 flex flex-col items-center">
-                            <img className="h-48 w-48 rounded-full object-cover shadow-lg border-4 border-white" src={member.imageUrl || `https://ui-avatars.com/api/?name=${member.firstName}+${member.lastName}&background=random&size=256`} alt={`Profile of ${member.firstName} ${member.lastName}`} />
-                            <div className="mt-6 w-full space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
-                                <ViewField label="Email" value={<a href={`mailto:${member.email}`} className="text-teal-600 hover:underline break-all">{member.email}</a>} />
-                                <ViewField label="Location" value={`${member.city || 'N/A'}, ${member.province}`} />
-                                <ViewField label="Availability" value={member.availability || 'N/A'} />
-                                <ViewField label="Member ID" value={member.memberId || 'N/A'} />
+                    <div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                            <div className="md:col-span-1 flex flex-col items-center">
+                                <img className="h-48 w-48 rounded-full object-cover shadow-lg border-4 border-white" src={member.imageUrl || `https://ui-avatars.com/api/?name=${member.firstName}+${member.lastName}&background=random&size=256`} alt={`Profile of ${member.firstName} ${member.lastName}`} />
+                                <div className="mt-6 w-full space-y-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                                    <ViewField label="Email" value={<a href={`mailto:${member.email}`} className="text-teal-600 hover:underline break-all">{member.email}</a>} />
+                                    <ViewField label="Location" value={`${member.city || 'N/A'}, ${member.province}`} />
+                                    <ViewField label="Availability" value={member.availability || 'N/A'} />
+                                    <ViewField label="Member ID" value={member.memberId || 'N/A'} />
+                                </div>
+                            </div>
+                            <div className="md:col-span-2 space-y-6">
+                                <ViewField label="Short Bio" children={<p>{member.shortBio || 'No short bio provided.'}</p>} />
+                                <ViewField label="Full Artist Bio" children={<p>{member.artistBio || 'No full artist bio provided.'}</p>} />
                             </div>
                         </div>
-                        <div className="md:col-span-2 space-y-6">
-                            <ViewField label="Short Bio" children={<p>{member.shortBio || 'No short bio provided.'}</p>} />
-                            <ViewField label="Full Artist Bio" children={<p>{member.artistBio || 'No full artist bio provided.'}</p>} />
+
+                        <div className="mt-12 space-y-8">
+                             <ViewField label="Active & Ongoing Projects">
+                                {activeProjects.length > 0 ? (
+                                    renderProjectList(activeProjects)
+                                ) : (
+                                    <p className="text-slate-500 italic mt-2">No active project assignments.</p>
+                                )}
+                            </ViewField>
+
+                            <ViewField label="Completed Projects">
+                                {completedProjects.length > 0 ? (
+                                    renderProjectList(completedProjects)
+                                ) : (
+                                    <p className="text-slate-500 italic mt-2">No completed project assignments.</p>
+                                )}
+                            </ViewField>
                         </div>
                     </div>
                 );
@@ -200,16 +317,20 @@ const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
                  return (
                     <div className="space-y-8">
                     <ViewField label="Contribution Snapshot">
-                        <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div className="bg-slate-50/70 border border-slate-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
                             <div className="border-r border-slate-200 pr-4">
                                 <p className="text-4xl font-extrabold text-red-600">{contributionSnapshot.totalHoursAllTime.toFixed(1)}</p>
                                 <p className="text-sm font-semibold text-slate-600">Total Hours Logged</p>
                             </div>
-                             <div className="border-r border-slate-200 pr-4">
-                                <p className="text-4xl font-extrabold text-teal-600">{contributionSnapshot.totalActiveProjects}</p>
-                                <p className="text-sm font-semibold text-slate-600">Active Projects</p>
+                            <div className="border-r border-slate-200 pr-4">
+                                <p className="text-4xl font-extrabold text-teal-600">{contributionSnapshot.totalOngoingProjects}</p>
+                                <p className="text-sm font-semibold text-slate-600">Active &amp; Ongoing Projects</p>
                             </div>
-                             <div>
+                            <div className="border-r border-slate-200 pr-4">
+                                <p className="text-4xl font-extrabold text-green-600">{contributionSnapshot.totalCompletedProjects}</p>
+                                <p className="text-sm font-semibold text-slate-600">Completed Projects</p>
+                            </div>
+                            <div>
                                 <p className="text-4xl font-extrabold text-blue-600">{contributionSnapshot.totalCompletedTasks}</p>
                                 <p className="text-sm font-semibold text-slate-600">Completed Tasks</p>
                             </div>
@@ -230,101 +351,6 @@ const MemberViewer: React.FC<MemberViewerProps> = ({ member, onBack }) => {
                                 ))}
                              </div>
                         </div>
-                    </ViewField>
-
-                    <ViewField label="Project Breakdown">
-                        {projectsWithDetails.length > 0 ? (
-                            <div className="mt-2 space-y-3">
-                                {projectsWithDetails.map(details => {
-                                    const isExpanded = openProjects.has(details.project.id);
-                                    return (
-                                        <div key={details.project.id} className="bg-slate-50 border border-slate-200 rounded-lg">
-                                            <button
-                                                onClick={() => toggleProject(details.project.id)}
-                                                className="w-full text-left p-3 flex flex-col gap-3 hover:bg-slate-100 rounded-t-lg transition-colors duration-150"
-                                                aria-expanded={isExpanded}
-                                            >
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <span className="font-semibold text-slate-800">{details.project.projectTitle}</span>
-                                                        {details.role && <span className="text-slate-500 text-sm"> as {details.role}</span>}
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2.5 py-1 text-xs font-semibold text-teal-800 bg-teal-100 rounded-full">{details.tasks.length} Task{details.tasks.length !== 1 ? 's' : ''}</span>
-                                                        <i className={`fa-solid fa-chevron-down text-slate-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`}></i>
-                                                    </div>
-                                                </div>
-                                                 <div className="grid grid-cols-3 gap-3 text-center">
-                                                    <div className="bg-white p-2 rounded-md border border-slate-200">
-                                                        <div className="text-xs text-slate-500 font-semibold">Task Progress</div>
-                                                        <div className="text-sm font-bold text-slate-700 mt-1">{details.completedTasks} / {details.tasks.length} Done</div>
-                                                    </div>
-                                                    <div className="bg-white p-2 rounded-md border border-slate-200">
-                                                        <div className="text-xs text-slate-500 font-semibold">Total Paid</div>
-                                                        <div className="text-sm font-bold text-blue-600 mt-1">{formatCurrency(details.totalPaidValue)}</div>
-                                                    </div>
-                                                    <div className="bg-white p-2 rounded-md border border-slate-200">
-                                                        <div className="text-xs text-slate-500 font-semibold">In-Kind Value</div>
-                                                        <div className="text-sm font-bold text-purple-600 mt-1">{formatCurrency(details.totalInKindValue)}</div>
-                                                    </div>
-                                                </div>
-                                            </button>
-                                            
-                                            {isExpanded && (
-                                                <div className="border-t border-slate-200 bg-white p-3 space-y-3">
-                                                    {details.tasks.length > 0 ? details.tasks.map(task => (
-                                                        <div key={task.id} className="bg-white border border-slate-200 rounded-md p-3">
-                                                            {/* Task Header */}
-                                                            <div className="flex justify-between items-start gap-2">
-                                                                <h4 className="font-bold text-slate-800">{task.title}</h4>
-                                                                <div className="flex-shrink-0 flex items-center gap-2">
-                                                                    <TaskStatusBadge status={task.status} />
-                                                                    <span className="font-mono text-xs bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded">{task.taskCode}</span>
-                                                                </div>
-                                                            </div>
-                                                            <p className={`text-xs mt-1 ${isTaskOverdue(task) ? 'text-red-500 font-bold' : 'text-slate-500'}`}>Due: {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}</p>
-                                                            <p className="text-sm text-slate-600 my-2">{task.description}</p>
-                                                            
-                                                            {/* Hours Progress */}
-                                                            {task.taskType === 'Time-Based' && (
-                                                                <div className="my-3">
-                                                                    <div className="flex justify-between text-xs font-medium text-slate-600 mb-1">
-                                                                        <span>Hours Logged</span>
-                                                                        <span>{task.loggedHours.toFixed(1)} / {task.estimatedHours}h</span>
-                                                                    </div>
-                                                                    <ProgressBar value={task.loggedHours} max={task.estimatedHours} />
-                                                                </div>
-                                                            )}
-                                                            
-                                                            {/* Activity Log */}
-                                                            {task.activities.length > 0 && (
-                                                                <div className="mt-3">
-                                                                    <h5 className="text-xs font-semibold text-slate-500 mb-1">Approved Activity Logs:</h5>
-                                                                    <table className="min-w-full text-xs">
-                                                                        <tbody className="divide-y divide-slate-100">
-                                                                            {task.activities.map(activity => (
-                                                                                <tr key={activity.id}>
-                                                                                    <td className="py-1.5 pr-2 w-full">{activity.description}</td>
-                                                                                    <td className="py-1.5 px-2 whitespace-nowrap">{new Date(activity.endDate).toLocaleDateString()}</td>
-                                                                                    <td className="py-1.5 px-2 whitespace-nowrap font-bold">{activity.hours}h</td>
-                                                                                    <td className="py-1.5 pl-2 text-right"><WorkTypeBadge type={activity.workType} /></td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )) : <p className="text-slate-500 italic text-center py-4">No tasks assigned for this project.</p>}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <p className="text-slate-500 italic">Not currently assigned to any projects.</p>
-                        )}
                     </ViewField>
                 </div>
                 );

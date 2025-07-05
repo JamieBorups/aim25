@@ -76,7 +76,7 @@ const RevenueCategoryItemsView: React.FC<{
     if (!items || items.length === 0) {
         return <p className="text-sm text-slate-400 italic py-2">No items in this category.</p>;
     }
-    const fieldMap = new Map(REVENUE_FIELDS[categoryPath[1] as keyof typeof REVENUE_FIELDS].map(f => [f.key, f.label]));
+    const fieldMap = new Map(Object.values(REVENUE_FIELDS).flat().map(f => [f.key, f.label]));
     
     return (
         <div className="space-y-1">
@@ -131,7 +131,8 @@ const RevenueCategoryItemsView: React.FC<{
 
 
 const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activities, directExpenses }) => {
-    const { setDirectExpenses, members } = useAppContext();
+    const { dispatch, state } = useAppContext();
+    const { members } = state;
     const budget = project.budget;
     const [expenseModalState, setExpenseModalState] = useState<{isOpen: boolean, category?: ExpenseCategoryType}>({isOpen: false});
     const [editingRevenueId, setEditingRevenueId] = useState<string | null>(null);
@@ -191,7 +192,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
     };
 
     const handleAddDirectExpense = (expense: DirectExpense) => {
-        setDirectExpenses(prev => [...prev, expense]);
+        dispatch({ type: 'ADD_DIRECT_EXPENSE', payload: expense });
     };
     
     const ExpenseCategoryView: React.FC<{title: string; categoryKey: ExpenseCategoryType; items: BudgetItem[]; fields: {key: string, label: string}[]}> = ({ title, categoryKey, items, fields }) => {
@@ -513,7 +514,15 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
 
                     {/* The Reality */}
                     <div className="mt-6 pt-4 border-t-2 border-slate-300">
-                        <h3 className="font-bold text-lg text-slate-800 mb-3">The Reality (Actuals to Date)</h3>
+                        <div className="flex items-center gap-2 mb-3">
+                            <h3 className="font-bold text-lg text-slate-800">The Reality (Actuals to Date)</h3>
+                            <div className="relative group">
+                                <i className="fa-solid fa-circle-info text-slate-500 cursor-help"></i>
+                                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 p-2 bg-slate-700 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 text-center">
+                                    Actuals include the value of all 'Approved' time logs and all direct expenses. 'Pending' activities are not included.
+                                </span>
+                            </div>
+                        </div>
                         <div className="space-y-2">
                              <RevenueViewField label="Actual Cash Received" value={<span className="font-bold text-green-700">{formatCurrency(budgetCalculations.totalActualRevenue)}</span>} />
                             <RevenueViewField label="Actual Cash Spent" value={<span className="font-bold text-blue-700">{formatCurrency(totalActualPaidExpenses)}</span>} />

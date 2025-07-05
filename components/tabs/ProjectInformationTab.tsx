@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { FormData } from '../../types';
+import { FormData, ProjectStatus } from '../../types';
 import FormField from '../ui/FormField';
 import { Input } from '../ui/Input';
 import { TextareaWithCounter } from '../ui/TextareaWithCounter';
@@ -17,6 +17,7 @@ import {
     THEATRE_GENRES,
     VISUAL_ARTS_GENRES,
     ACTIVITY_TYPES,
+    PROJECT_STATUS_OPTIONS,
 } from '../../constants';
 
 interface Props {
@@ -58,6 +59,14 @@ const ProjectInformationTab: React.FC<Props> = ({ formData, onChange }) => {
             onChange={e => onChange('projectTitle', e.target.value)}
             wordLimit={15}
             />
+      </FormField>
+
+      <FormField label="Project Status" htmlFor="status" required>
+        <Select 
+            id="status" 
+            options={PROJECT_STATUS_OPTIONS}
+            value={formData.status} 
+            onChange={e => onChange('status', e.target.value as ProjectStatus)} />
       </FormField>
 
       <FormField label="Artistic discipline(s) most relevant to this application" htmlFor="artisticDisciplines" required instructions={<span>See glossary for <a href="#" className="text-teal-600 hover:underline">the definition of inter-arts (interdisciplinary arts)</a>.</span>}>

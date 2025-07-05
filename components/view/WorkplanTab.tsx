@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { FormData, Task, Activity, TaskStatus, ActivityStatus, TaskSortOption, SortDirection, TaskStatusFilter } from '../../types';
 import { useAppContext } from '../../context/AppContext';
@@ -30,11 +31,8 @@ const getActivityStatusBadge = (status: ActivityStatus) => {
 const isTaskOverdue = (task: Task) => !task.isComplete && task.dueDate && new Date(task.dueDate) < new Date();
 
 const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
-    const { 
-        tasks, setTasks, 
-        activities, setActivities, 
-        members, notify, approveActivity 
-    } = useAppContext();
+    const { state, dispatch, notify } = useAppContext();
+    const { tasks, activities, members } = state;
 
     const [isTaskEditorOpen, setIsTaskEditorOpen] = useState(false);
     const [currentTask, setCurrentTask] = useState<Task | null>(null);
@@ -132,12 +130,11 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
     };
 
     const handleSaveTask = (taskToSave: Task) => {
-        const isNew = !tasks.some(t => t.id === taskToSave.id);
-        const taskWithTimestamp = { ...taskToSave, updatedAt: new Date().toISOString() };
-        setTasks(prev => {
-            const index = prev.findIndex(t => t.id === taskWithTimestamp.id);
-            return index > -1 ? prev.map(t => t.id === taskWithTimestamp.id ? taskWithTimestamp : t) : [...prev, taskWithTimestamp];
-        });
+        const isNew = !tasks.find(t => t.id === taskToSave.id);
+        const now = new Date().toISOString();
+        const finalTask = { ...taskToSave, updatedAt: now };
+
+        dispatch({ type: isNew ? 'ADD_TASK' : 'UPDATE_TASK', payload: finalTask });
         notify(isNew ? 'Task created!' : 'Task updated!', 'success');
         setIsTaskEditorOpen(false);
         setCurrentTask(null);
@@ -146,13 +143,10 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
     const handleToggleTaskComplete = (id: string) => {
         const task = tasks.find(t => t.id === id);
         if (task) {
+            const updatedTask = { ...task, isComplete: !task.isComplete, status: (!task.isComplete ? 'Done' : 'To Do') as TaskStatus, updatedAt: new Date().toISOString() };
+            dispatch({ type: 'UPDATE_TASK', payload: updatedTask });
             notify(task.isComplete ? `Task '${task.title}' marked as incomplete.` : `Task '${task.title}' marked as complete.`, 'success');
         }
-        setTasks(prevTasks => 
-            prevTasks.map(t => 
-                t.id === id ? { ...t, isComplete: !t.isComplete, status: !t.isComplete ? 'Done' : 'To Do', updatedAt: new Date().toISOString() } : t
-            )
-        );
       };
 
     // --- Activity Handlers ---
@@ -172,8 +166,9 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
         const isEditing = activityToSave.id && activityToSave.createdAt;
     
         if (isEditing) {
-            const { memberIds, ...updatedActivity } = activityToSave;
-            setActivities(prev => prev.map(a => a.id === updatedActivity.id ? {...updatedActivity, updatedAt: now } : a));
+            const { memberIds, ...baseActivity } = activityToSave;
+            const updatedActivity = { ...baseActivity, updatedAt: now };
+            dispatch({ type: 'UPDATE_ACTIVITY', payload: updatedActivity });
             notify('Activity updated!', 'success');
         } else if (activityToSave.memberIds && activityToSave.memberIds.length > 0) {
             const { memberIds, ...baseActivityData } = activityToSave;
@@ -185,12 +180,17 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
                 createdAt: now,
                 updatedAt: now,
             }));
-            setActivities(prev => [...prev, ...newActivities]);
+            dispatch({ type: 'ADD_ACTIVITIES', payload: newActivities });
             notify(`${newActivities.length} new activity log(s) created!`, 'success');
         }
     
         setIsActivityEditorOpen(false);
         setCurrentActivity(null);
+    };
+
+    const handleApproveActivity = (activityId: string) => {
+        dispatch({ type: 'APPROVE_ACTIVITY', payload: activityId });
+        notify('Activity approved.', 'success');
     };
     
     // --- Delete Handlers ---
@@ -202,11 +202,10 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
     const confirmDelete = () => {
         if (!itemToDelete) return;
         if (itemToDelete.type === 'task') {
-            setTasks(prev => prev.filter(t => t.id !== itemToDelete.id));
-            setActivities(prev => prev.filter(a => a.taskId !== itemToDelete.id));
+            dispatch({ type: 'DELETE_TASK', payload: itemToDelete.id });
             notify('Task and related activities deleted.', 'success');
         } else {
-            setActivities(prev => prev.filter(a => a.id !== itemToDelete.id));
+            dispatch({ type: 'DELETE_ACTIVITY', payload: itemToDelete.id });
             notify('Activity deleted.', 'success');
         }
         setIsDeleteModalOpen(false);
@@ -302,7 +301,7 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
                                         ) : (
                                             <span className={getTaskStatusBadge(task.status)}>{task.status}</span>
                                         )}
-                                        <button onClick={() => handleAddActivityForTask(task.id)} className="px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700">Log Activity</button>
+                                        <button onClick={() => handleAddActivityForTask(task.id)} className="px-2 py-1 text-xs font-semibold text-white bg-blue-600 rounded-md shadow-sm hover:bg-blue-700">Log Time</button>
                                         <button onClick={() => handleEditTask(task)} className="p-2 text-slate-500 hover:text-teal-600"><i className="fa-solid fa-pencil"></i></button>
                                         <button onClick={() => requestDelete(task.id, 'task')} className="p-2 text-slate-500 hover:text-red-600"><i className="fa-solid fa-trash-alt"></i></button>
                                     </div>
@@ -322,7 +321,7 @@ const WorkplanTab: React.FC<{ project: FormData }> = ({ project }) => {
                                                             <td className="p-3 font-semibold">{activity.hours}h</td>
                                                             <td className="p-3"><span className={getActivityStatusBadge(activity.status)}>{activity.status}</span></td>
                                                             <td className="p-3 text-right space-x-3">
-                                                                {activity.status === 'Pending' && <button onClick={() => approveActivity(activity.id)} className="font-semibold text-green-600 hover:text-green-800">Approve</button>}
+                                                                {activity.status === 'Pending' && <button onClick={() => handleApproveActivity(activity.id)} className="font-semibold text-green-600 hover:text-green-800">Approve</button>}
                                                                 <button onClick={() => handleEditActivity(activity)} className="font-semibold text-teal-600 hover:text-teal-800">Edit</button>
                                                                 <button onClick={() => requestDelete(activity.id, 'activity')} className="font-semibold text-red-600 hover:text-red-800">Delete</button>
                                                             </td>

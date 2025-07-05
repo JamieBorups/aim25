@@ -1,6 +1,6 @@
+
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { useBudgetCalculations } from '../hooks/useBudgetCalculations';
 import { Activity, BudgetItem, DetailedBudget, Page, Task } from '../types';
 
 const formatCurrency = (value: number) => value.toLocaleString('en-CA', { style: 'currency', currency: 'CAD' });
@@ -60,7 +60,8 @@ const WelcomeScreen: React.FC<HomePageProps> = ({ onNavigate }) => {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
-    const { projects, members, tasks, activities, directExpenses, approveActivity } = useAppContext();
+    const { state, dispatch } = useAppContext();
+    const { projects, members, tasks, activities, directExpenses } = state;
 
     const taskMap = useMemo(() => new Map(tasks.map(t => [t.id, t])), [tasks]);
     const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p.projectTitle])), [projects]);
@@ -68,67 +69,87 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
 
     const dashboardData = useMemo(() => {
         const approvedActivities = activities.filter(a => a.status === 'Approved');
-        const activeProjects = projects.filter(p => p.status === 'Active');
-        const activeProjectIds = new Set(activeProjects.map(p => p.id));
-        const activeTasks = tasks.filter(t => activeProjectIds.has(t.projectId));
-        const activeTaskIds = new Set(activeTasks.map(t => t.id));
-
-        // Key Metrics
+        
+        // --- DATA FOR TOP METRIC CARDS ---
+        const activeProjectsCount = projects.filter(p => p.status === 'Active').length;
+        const completedProjectsCount = projects.filter(p => p.status === 'Completed').length;
+        
         const now = new Date();
         const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const tasksDueThisWeek = activeTasks.filter(task => {
+        
+        const activeTasksForDeadlines = tasks.filter(task => {
+            const project = projects.find(p => p.id === task.projectId);
+            return project?.status === 'Active';
+        });
+
+        const tasksDueThisWeek = activeTasksForDeadlines.filter(task => {
             if (task.isComplete || !task.dueDate) return false;
             const dueDate = new Date(task.dueDate);
             return dueDate >= now && dueDate <= oneWeekFromNow;
         });
 
-        const pendingActivities = activities.filter(a => a.status === 'Pending' && activeTaskIds.has(a.taskId));
+        const operationalProjectIdsForPending = new Set(projects.filter(p => ['Active', 'On Hold'].includes(p.status)).map(p => p.id));
+        const pendingActivities = activities.filter(a => {
+            const task = taskMap.get(a.taskId);
+            return a.status === 'Pending' && task && operationalProjectIdsForPending.has(task.projectId);
+        });
 
-        // Financial Snapshot
-        const sumAmounts = (items: BudgetItem[] = []) => items.reduce((sum, item) => sum + (item.amount || 0), 0);
-        const calculateProjectRevenue = (budget: DetailedBudget): number => {
-            const { grants, tickets, sales, fundraising, contributions } = budget.revenues;
-            const totalGrants = sumAmounts(grants);
-            const projectedAudience = (tickets.numVenues || 0) * ((tickets.percentCapacity || 0) / 100) * (tickets.venueCapacity || 0);
-            const totalTickets = projectedAudience * (tickets.avgTicketPrice || 0);
-            const totalSales = sumAmounts(sales);
-            const totalFundraising = sumAmounts(fundraising);
-            const totalContributions = sumAmounts(contributions);
-            return totalGrants + totalTickets + totalSales + totalFundraising + totalContributions;
+        // --- OPERATIONAL FINANCIALS (Active & On Hold) ---
+        const operationalProjects = projects.filter(p => ['Active', 'On Hold'].includes(p.status));
+        const operationalProjectIds = new Set(operationalProjects.map(p => p.id));
+        const operationalTaskIds = new Set(tasks.filter(t => operationalProjectIds.has(t.projectId)).map(t => t.id));
+
+        const calculateProjectBudgetedExpenses = (budget: DetailedBudget): number => {
+            return Object.values(budget.expenses).flat().reduce((sum, item) => sum + (item.amount || 0), 0);
         };
         
-        const totalBudgetedRevenue = activeProjects.reduce((total, p) => total + calculateProjectRevenue(p.budget), 0);
+        const totalBudgetedExpenses = operationalProjects.reduce((total, p) => total + calculateProjectBudgetedExpenses(p.budget), 0);
         
         const totalActualPaidExpenses = approvedActivities
-            .filter(a => activeTaskIds.has(a.taskId))
-            .reduce((total, activity) => {
-                const task = taskMap.get(activity.taskId);
-                if (task && task.workType === 'Paid') {
-                    return total + (activity.hours || 0) * (task.hourlyRate || 0);
-                }
-                return total;
-            }, 0) + directExpenses.filter(e => activeProjectIds.has(e.projectId)).reduce((total, expense) => total + expense.amount, 0);
+            .filter(a => operationalTaskIds.has(a.taskId) && taskMap.get(a.taskId)?.workType === 'Paid')
+            .reduce((total, activity) => total + ((activity.hours || 0) * (taskMap.get(activity.taskId)?.hourlyRate || 0)), 0)
+            + directExpenses.filter(e => operationalProjectIds.has(e.projectId)).reduce((total, expense) => total + expense.amount, 0);
 
-        // Hours Metrics
+        // --- LIFETIME FINANCIALS (Active, On Hold, Completed) ---
+        const lifetimeProjects = projects.filter(p => ['Active', 'On Hold', 'Completed'].includes(p.status));
+        const lifetimeProjectIds = new Set(lifetimeProjects.map(p => p.id));
+        const lifetimeTaskIds = new Set(tasks.filter(t => lifetimeProjectIds.has(t.projectId)).map(t => t.id));
+
+        const totalLifetimeActualRevenue = lifetimeProjects.reduce((total, p) => {
+            const budget = p.budget;
+            const grants = budget.revenues.grants.reduce((s, i) => s + (i.actualAmount || 0), 0);
+            const tickets = budget.revenues.tickets.actualTotalTickets || 0;
+            const sales = budget.revenues.sales.reduce((s, i) => s + (i.actualAmount || 0), 0);
+            const fundraising = budget.revenues.fundraising.reduce((s, i) => s + (i.actualAmount || 0), 0);
+            const contributions = budget.revenues.contributions.reduce((s, i) => s + (i.actualAmount || 0), 0);
+            return total + grants + tickets + sales + fundraising + contributions;
+        }, 0);
+
+        const totalLifetimeActualExpenses = approvedActivities
+            .filter(a => lifetimeTaskIds.has(a.taskId) && taskMap.get(a.taskId)?.workType === 'Paid')
+            .reduce((total, activity) => total + ((activity.hours || 0) * (taskMap.get(activity.taskId)?.hourlyRate || 0)), 0)
+            + directExpenses.filter(e => lifetimeProjectIds.has(e.projectId)).reduce((total, expense) => total + expense.amount, 0);
+
+        // --- GENERAL METRICS (All Time) ---
         const totalHoursAllTime = approvedActivities.reduce((sum, a) => sum + (a.hours || 0), 0);
-
         const hoursByMember = new Map<string, number>();
         approvedActivities.forEach(a => {
             hoursByMember.set(a.memberId, (hoursByMember.get(a.memberId) || 0) + (a.hours || 0));
         });
-
         const topContributors = Array.from(hoursByMember.entries())
             .map(([memberId, hours]) => ({ memberId, hours }))
             .sort((a, b) => b.hours - a.hours)
             .slice(0, 5);
 
-
         return {
-            activeProjectsCount: activeProjects.length,
+            activeProjectsCount,
+            completedProjectsCount,
             tasksDueThisWeek,
             pendingActivities,
-            totalBudgetedRevenue,
+            totalBudgetedExpenses,
             totalActualPaidExpenses,
+            totalLifetimeActualRevenue,
+            totalLifetimeActualExpenses,
             totalHoursAllTime,
             topContributors,
         };
@@ -148,10 +169,11 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             </div>
 
             {/* Key Metrics */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
                 <MetricCard icon="fa-solid fa-briefcase" value={dashboardData.activeProjectsCount} label="Active Projects" color="#14b8a6" />
+                <MetricCard icon="fa-solid fa-check-double" value={dashboardData.completedProjectsCount} label="Completed Projects" color="#3b82f6" />
                 <MetricCard icon="fa-solid fa-clock-rotate-left" value={dashboardData.pendingActivities.length} label="Pending Approvals" color="#f97316" />
-                <MetricCard icon="fa-solid fa-list-check" value={dashboardData.tasksDueThisWeek.length} label="Tasks Due This Week" color="#3b82f6" />
+                <MetricCard icon="fa-solid fa-list-check" value={dashboardData.tasksDueThisWeek.length} label="Tasks Due This Week" color="#f59e0b" />
                 <MetricCard icon="fa-solid fa-users" value={members.length} label="Collective Members" color="#8b5cf6" />
                 <MetricCard icon="fa-solid fa-hourglass-half" value={dashboardData.totalHoursAllTime.toFixed(1)} label="Total Hours Logged" color="#ef4444" />
             </div>
@@ -159,24 +181,44 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Left Column */}
                 <div className="lg:col-span-2 space-y-8">
-                     <DashboardWidget title="Global Financial Snapshot (Active Projects)" icon="fa-solid fa-chart-pie">
+                     <DashboardWidget title="Operational Financial Snapshot (Active & On Hold Projects)" icon="fa-solid fa-chart-pie">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
                             <div className="bg-slate-100 p-4 rounded-lg">
-                                <div className="text-sm text-slate-500 font-semibold">Total Budgeted Revenue</div>
-                                <div className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalBudgetedRevenue)}</div>
+                                <div className="text-sm text-slate-500 font-semibold">Total Budgeted Expenses</div>
+                                <div className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalBudgetedExpenses)}</div>
                             </div>
                              <div className="bg-slate-100 p-4 rounded-lg">
                                 <div className="text-sm text-slate-500 font-semibold">Total Actual Expenses</div>
-                                <div className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalActualPaidExpenses)}</div>
+                                <div className="text-2xl font-bold text-blue-800">{formatCurrency(dashboardData.totalActualPaidExpenses)}</div>
                             </div>
                             <div className="bg-slate-200 p-4 rounded-lg">
-                                <div className="text-sm text-slate-600 font-bold">Net Balance</div>
-                                <div className={`text-2xl font-extrabold ${dashboardData.totalBudgetedRevenue - dashboardData.totalActualPaidExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatCurrency(dashboardData.totalBudgetedRevenue - dashboardData.totalActualPaidExpenses)}
+                                <div className="text-sm text-slate-600 font-bold">Remaining Budget</div>
+                                <div className={`text-2xl font-extrabold ${dashboardData.totalBudgetedExpenses - dashboardData.totalActualPaidExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(dashboardData.totalBudgetedExpenses - dashboardData.totalActualPaidExpenses)}
                                 </div>
                             </div>
                         </div>
                     </DashboardWidget>
+
+                    <DashboardWidget title="Lifetime Financial Summary" icon="fa-solid fa-landmark">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div className="bg-slate-100 p-4 rounded-lg">
+                                <div className="text-sm text-slate-500 font-semibold">Total Lifetime Revenue</div>
+                                <div className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalLifetimeActualRevenue)}</div>
+                            </div>
+                             <div className="bg-slate-100 p-4 rounded-lg">
+                                <div className="text-sm text-slate-500 font-semibold">Total Lifetime Expenses</div>
+                                <div className="text-2xl font-bold text-slate-800">{formatCurrency(dashboardData.totalLifetimeActualExpenses)}</div>
+                            </div>
+                            <div className="bg-slate-200 p-4 rounded-lg">
+                                <div className="text-sm text-slate-600 font-bold">Lifetime Net Result</div>
+                                <div className={`text-2xl font-extrabold ${dashboardData.totalLifetimeActualRevenue - dashboardData.totalLifetimeActualExpenses >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(dashboardData.totalLifetimeActualRevenue - dashboardData.totalLifetimeActualExpenses)}
+                                </div>
+                            </div>
+                        </div>
+                    </DashboardWidget>
+
                     <DashboardWidget title="Pending Approvals" icon="fa-solid fa-clock-rotate-left">
                         {dashboardData.pendingActivities.length > 0 ? (
                             <ul className="divide-y divide-slate-200 -mx-6">
@@ -191,7 +233,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate }) => {
                                                 </div>
                                             </div>
                                             <button 
-                                                onClick={() => approveActivity(activity.id)}
+                                                onClick={() => dispatch({ type: 'APPROVE_ACTIVITY', payload: activity.id })}
                                                 className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 rounded-full shadow-sm hover:bg-green-700 transition-colors"
                                             >
                                                 <i className="fa-solid fa-check mr-1"></i> Approve
