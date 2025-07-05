@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData';
@@ -5,7 +6,7 @@ export type TabId = 'projectInfo' | 'collaborators' | 'budget';
 export type ProjectViewTabId = 'info' | 'collaborators' | 'budget' | 'workplan' | 'insights';
 export type TaskManagerView = 'workplan' | 'tasks' | 'activities';
 export type NotificationType = 'success' | 'error' | 'info' | 'warning';
-export type ProjectStatus = 'Active' | 'On Hold' | 'Completed';
+export type ProjectStatus = 'Pending' | 'Active' | 'On Hold' | 'Completed' | 'Terminated';
 export type DateRangeFilter = 'all' | 'last7days' | 'last30days' | 'thisMonth';
 export type BudgetItemStatus = 'Pending' | 'Approved' | 'Denied';
 
@@ -201,23 +202,43 @@ export interface FormFieldProps<T> {
   ariaLabel?: string;
 }
 
-// NOTE: This is defined in AppContext.tsx but placing here for broader type safety
+// --- Reducer State & Actions ---
+export interface AppState {
+    projects: FormData[];
+    members: Member[];
+    tasks: Task[];
+    activities: Activity[];
+    directExpenses: DirectExpense[];
+    reports: Report[];
+    reportProjectIdToOpen: string | null;
+}
+
+export type Action =
+  | { type: 'SET_PROJECTS'; payload: FormData[] }
+  | { type: 'UPDATE_PROJECT_STATUS'; payload: { projectId: string; status: ProjectStatus } }
+  | { type: 'DELETE_PROJECT'; payload: string }
+  | { type: 'SET_MEMBERS'; payload: Member[] }
+  | { type: 'DELETE_MEMBER'; payload: string }
+  | { type: 'SET_TASKS'; payload: Task[] }
+  | { type: 'ADD_TASK'; payload: Task }
+  | { type: 'UPDATE_TASK'; payload: Task }
+  | { type: 'DELETE_TASK'; payload: string }
+  | { type: 'SET_ACTIVITIES'; payload: Activity[] }
+  | { type: 'ADD_ACTIVITIES'; payload: Activity[] }
+  | { type: 'UPDATE_ACTIVITY'; payload: Activity }
+  | { type: 'APPROVE_ACTIVITY'; payload: string }
+  | { type: 'DELETE_ACTIVITY'; payload: string }
+  | { type: 'SET_DIRECT_EXPENSES'; payload: DirectExpense[] }
+  | { type: 'ADD_DIRECT_EXPENSE'; payload: DirectExpense }
+  | { type: 'SET_REPORTS'; payload: Report[] }
+  | { type: 'SET_REPORT_PROJECT_ID_TO_OPEN'; payload: string | null }
+  | { type: 'CLEAR_ALL_DATA' }
+  | { type: 'LOAD_DATA'; payload: Omit<AppState, 'reportProjectIdToOpen'> };
+
+
+// --- App Context Type ---
 export interface AppContextType {
-  projects: FormData[];
-  setProjects: React.Dispatch<React.SetStateAction<FormData[]>>;
-  members: Member[];
-  setMembers: React.Dispatch<React.SetStateAction<Member[]>>;
-  tasks: Task[];
-  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  activities: Activity[];
-  setActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
-  directExpenses: DirectExpense[];
-  setDirectExpenses: React.Dispatch<React.SetStateAction<DirectExpense[]>>;
-  reports: Report[];
-  setReports: React.Dispatch<React.SetStateAction<Report[]>>;
+  state: AppState;
+  dispatch: React.Dispatch<Action>;
   notify: (message: string, type: NotificationType) => void;
-  approveActivity: (activityId: string) => void;
-  reportProjectIdToOpen: string | null;
-  setReportProjectIdToOpen: React.Dispatch<React.SetStateAction<string | null>>;
-  clearAllData: () => void;
 }

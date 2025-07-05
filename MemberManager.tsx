@@ -1,5 +1,5 @@
+
 import React, { useState } from 'react';
-import { produce } from 'https://esm.sh/immer';
 import MemberList from './components/MemberList';
 import MemberEditor from './components/MemberEditor';
 import MemberViewer from './components/MemberViewer';
@@ -11,7 +11,8 @@ import { useAppContext } from './context/AppContext';
 type ViewMode = 'list' | 'edit' | 'view';
 
 const MemberManager: React.FC = () => {
-  const { members, setMembers, projects, setProjects, tasks, setTasks, notify } = useAppContext();
+  const { state, dispatch, notify } = useAppContext();
+  const { members } = state;
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentMember, setCurrentMember] = useState<Member | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -50,29 +51,7 @@ const MemberManager: React.FC = () => {
   const confirmDeleteMember = () => {
     if (!memberToDelete) return;
 
-    // Remove member from collaborator lists in projects
-    setProjects(currentProjects => 
-        produce(currentProjects, draft => {
-            draft.forEach(project => {
-                project.collaboratorDetails = project.collaboratorDetails.filter(c => c.memberId !== memberToDelete);
-            });
-        })
-    );
-
-    // Unassign member from tasks
-    setTasks(currentTasks => 
-        produce(currentTasks, draft => {
-            draft.forEach(task => {
-                if (task.assignedMemberId === memberToDelete) {
-                    task.assignedMemberId = '';
-                }
-            });
-        })
-    );
-
-    // Delete the member
-    setMembers(prev => prev.filter(m => m.id !== memberToDelete));
-    
+    dispatch({ type: 'DELETE_MEMBER', payload: memberToDelete });
     notify('Member deleted and unassigned from all projects and tasks.', 'success');
 
     // Reset state
@@ -84,16 +63,13 @@ const MemberManager: React.FC = () => {
 
   const handleSaveMember = (memberToSave: Member) => {
     const isNew = !members.some(m => m.id === memberToSave.id);
-    setMembers(prevMembers => {
-      const index = prevMembers.findIndex(p => p.id === memberToSave.id);
-      if (index > -1) {
-        const updatedMembers = [...prevMembers];
-        updatedMembers[index] = memberToSave;
-        return updatedMembers;
-      } else {
-        return [...prevMembers, memberToSave];
-      }
-    });
+
+    const updatedMembers = isNew
+        ? [...members, memberToSave]
+        : members.map(m => m.id === memberToSave.id ? memberToSave : m);
+
+    dispatch({ type: 'SET_MEMBERS', payload: updatedMembers });
+
     notify(isNew ? 'Member added successfully!' : 'Member updated successfully!', 'success');
     setViewMode('list');
     setCurrentMember(null);

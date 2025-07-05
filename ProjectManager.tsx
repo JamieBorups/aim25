@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import ProjectList from './components/ProjectList';
 import ProjectEditor from './components/ProjectEditor';
@@ -14,7 +15,8 @@ interface ProjectManagerProps {
 }
 
 const ProjectManager: React.FC<ProjectManagerProps> = ({ onNavigate }) => {
-  const { projects, setProjects, notify, tasks, setTasks, activities, setActivities, directExpenses, setDirectExpenses, reports, setReports, setReportProjectIdToOpen } = useAppContext();
+  const { state, dispatch, notify } = useAppContext();
+  const { projects } = state;
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [currentProject, setCurrentProject] = useState<FormData_type | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -57,16 +59,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ onNavigate }) => {
   const confirmDeleteProject = () => {
     if (!projectToDelete) return;
     
-    // Cascading delete logic
-    const tasksToDelete = tasks.filter(t => t.projectId === projectToDelete);
-    const taskIdsToDelete = new Set(tasksToDelete.map(t => t.id));
-
-    setProjects(prev => prev.filter(p => p.id !== projectToDelete));
-    setTasks(prev => prev.filter(t => t.projectId !== projectToDelete));
-    setActivities(prev => prev.filter(a => !taskIdsToDelete.has(a.taskId)));
-    setDirectExpenses(prev => prev.filter(d => d.projectId !== projectToDelete));
-    setReports(prev => prev.filter(r => r.projectId !== projectToDelete));
-
+    dispatch({ type: 'DELETE_PROJECT', payload: projectToDelete });
     notify('Project and all associated data deleted.', 'success');
 
     // Reset state
@@ -79,16 +72,19 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ onNavigate }) => {
 
   const handleSaveProject = (projectToSave: FormData_type) => {
     const isNewProject = !projects.find(p => p.id === projectToSave.id);
-    setProjects(prevProjects => {
-      const index = prevProjects.findIndex(p => p.id === projectToSave.id);
-      if (index > -1) {
-        const updatedProjects = [...prevProjects];
-        updatedProjects[index] = projectToSave;
-        return updatedProjects;
-      } else {
-        return [...prevProjects, projectToSave];
-      }
-    });
+    const originalProject = projects.find(p => p.id === projectToSave.id);
+
+    const updatedProjects = isNewProject
+      ? [...projects, projectToSave]
+      : projects.map(p => p.id === projectToSave.id ? projectToSave : p);
+      
+    dispatch({ type: 'SET_PROJECTS', payload: updatedProjects });
+    
+    // Check for status change to 'Completed' from a different status
+    if (originalProject && originalProject.status !== 'Completed' && projectToSave.status === 'Completed') {
+        setProjectToComplete(projectToSave.id);
+        setIsReportModalOpen(true);
+    }
 
     if (viewMode === 'edit') {
         notify(isNewProject ? 'Project created successfully!' : 'Project saved successfully!', 'success');
@@ -106,12 +102,12 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ onNavigate }) => {
   };
   
   const handleUpdateProjectStatus = (projectId: string, status: ProjectStatus) => {
-    setProjects(prev => prev.map(p => 
-      p.id === projectId ? { ...p, status: status } : p
-    ));
+    const originalProject = projects.find(p => p.id === projectId);
+    
+    dispatch({ type: 'UPDATE_PROJECT_STATUS', payload: { projectId, status } });
     notify(`Project status updated to ${status}.`, 'success');
 
-    if (status === 'Completed') {
+    if (originalProject && originalProject.status !== 'Completed' && status === 'Completed') {
       setProjectToComplete(projectId);
       setIsReportModalOpen(true);
     }
@@ -119,7 +115,7 @@ const ProjectManager: React.FC<ProjectManagerProps> = ({ onNavigate }) => {
 
   const confirmGenerateReport = () => {
     if (!projectToComplete) return;
-    setReportProjectIdToOpen(projectToComplete);
+    dispatch({ type: 'SET_REPORT_PROJECT_ID_TO_OPEN', payload: projectToComplete });
     onNavigate('reports');
     setIsReportModalOpen(false);
     setProjectToComplete(null);

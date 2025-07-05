@@ -1,3 +1,5 @@
+
+
 import React, { useState } from 'react';
 import TaskList from './components/task/TaskList';
 import TaskEditor from './components/task/TaskEditor';
@@ -6,13 +8,14 @@ import ActivityList from './components/task/ActivityList';
 import ActivityEditor from './components/task/ActivityEditor';
 import ConfirmationModal from './components/ui/ConfirmationModal';
 import { initialTaskData, initialActivityData } from './constants';
-import { Task, TaskManagerView, Activity } from './types';
+import { Task, TaskManagerView, Activity, TaskStatus } from './types';
 import { Select } from './components/ui/Select';
 import FormField from './components/ui/FormField';
 import { useAppContext } from './context/AppContext';
 
 const TaskManager: React.FC = () => {
-  const { tasks, setTasks, projects, members, activities, setActivities, notify } = useAppContext();
+  const { state, dispatch, notify } = useAppContext();
+  const { tasks, projects, members, activities } = state;
   const [view, setView] = useState<TaskManagerView>('workplan');
   const [selectedProjectId, setSelectedProjectId] = useState(''); // '' for All Projects
   
@@ -38,24 +41,18 @@ const TaskManager: React.FC = () => {
     const project = projects.find(p => p.id === selectedProjectId);
     let taskCode = '';
     if (project) {
-        // Create prefix from project title
         const prefix = (project.projectTitle.match(/\b(\w)/g) || ['T']).join('').toUpperCase().substring(0, 4);
-
-        // Find highest existing number for this project
         const projectTasks = tasks.filter(t => t.projectId === selectedProjectId && t.taskCode.startsWith(prefix));
         let maxNum = 0;
         projectTasks.forEach(t => {
             const numPart = t.taskCode.split('-')[1];
             if (numPart) {
                 const num = parseInt(numPart, 10);
-                if (!isNaN(num) && num > maxNum) {
-                    maxNum = num;
-                }
+                if (!isNaN(num) && num > maxNum) maxNum = num;
             }
         });
         taskCode = `${prefix}-${maxNum + 1}`;
     } else {
-        // Fallback if no project is selected
         taskCode = `TASK-${tasks.filter(t => !t.projectId).length + 1}`;
     }
     
@@ -64,7 +61,7 @@ const TaskManager: React.FC = () => {
         ...initialTaskData, 
         id: `task_${Date.now()}`, 
         projectId: selectedProjectId,
-        taskCode: taskCode, // Add the new code
+        taskCode: taskCode,
     };
     setCurrentTask(newTask);
     setIsTaskEditorOpen(true);
@@ -85,12 +82,8 @@ const TaskManager: React.FC = () => {
 
   const confirmDeleteTask = () => {
     if (!taskToDelete) return;
-
-    setTasks(tasks.filter(t => t.id !== taskToDelete));
-    setActivities(activities.filter(a => a.taskId !== taskToDelete));
-
+    dispatch({ type: 'DELETE_TASK', payload: taskToDelete });
     notify('Task and related activities deleted.', 'success');
-    
     setIsTaskDeleteModalOpen(false);
     setTaskToDelete(null);
   };
@@ -100,17 +93,7 @@ const TaskManager: React.FC = () => {
     const now = new Date().toISOString();
     const taskWithTimestamp = { ...taskToSave, updatedAt: now };
 
-    setTasks(prev => {
-        const index = prev.findIndex(t => t.id === taskWithTimestamp.id);
-        if (index > -1) {
-            const updatedTasks = [...prev];
-            updatedTasks[index] = taskWithTimestamp;
-            return updatedTasks;
-        } else {
-            return [...prev, taskWithTimestamp];
-        }
-    });
-
+    dispatch({ type: isNew ? 'ADD_TASK' : 'UPDATE_TASK', payload: taskWithTimestamp });
     notify(isNew ? 'Task created successfully!' : 'Task updated successfully!', 'success');
     setIsTaskEditorOpen(false);
     setCurrentTask(null);
@@ -119,18 +102,15 @@ const TaskManager: React.FC = () => {
   const handleToggleTaskComplete = (id: string) => {
     const task = tasks.find(t => t.id === id);
     if (task) {
+        const updatedTask = { ...task, isComplete: !task.isComplete, status: (!task.isComplete ? 'Done' : 'To Do') as TaskStatus, updatedAt: new Date().toISOString() };
+        dispatch({ type: 'UPDATE_TASK', payload: updatedTask });
         notify(task.isComplete ? `Task '${task.title}' marked as incomplete.` : `Task '${task.title}' marked as complete.`, 'success');
     }
-    setTasks(prevTasks => 
-        prevTasks.map(t => 
-            t.id === id ? { ...t, isComplete: !t.isComplete, status: !t.isComplete ? 'Done' : 'To Do', updatedAt: new Date().toISOString() } : t
-        )
-    );
   };
 
   // --- Activity Handlers ---
   const handleAddActivity = () => {
-    const newActivity: Activity = { ...initialActivityData, id: ``, createdAt: '' }; // Clear ID and timestamps for new entries
+    const newActivity: Activity = { ...initialActivityData, id: ``, createdAt: '' };
     setCurrentActivity(newActivity);
     setIsActivityEditorOpen(true);
   };
@@ -138,16 +118,10 @@ const TaskManager: React.FC = () => {
   const handleAddActivityForTask = (taskId: string) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
-
-    const newActivity: Activity = {
-      ...initialActivityData,
-      taskId: task.id,
-      description: ``,
-    };
+    const newActivity: Activity = { ...initialActivityData, taskId: task.id, description: `` };
     setCurrentActivity(newActivity);
     setIsActivityEditorOpen(true);
   };
-
 
   const handleEditActivity = (id: string) => {
     const activityToEdit = activities.find(a => a.id === id);
@@ -159,13 +133,13 @@ const TaskManager: React.FC = () => {
 
   const handleDeleteActivity = (id: string) => {
     if (window.confirm('Are you sure you want to delete this activity?')) {
-      setActivities(activities.filter(a => a.id !== id));
+      dispatch({ type: 'DELETE_ACTIVITY', payload: id });
       notify('Activity deleted.', 'success');
     }
   };
 
   const handleApproveActivity = (id: string) => {
-    setActivities(prevActivities => prevActivities.map(a => a.id === id ? { ...a, status: 'Approved', updatedAt: new Date().toISOString() } : a));
+    dispatch({ type: 'APPROVE_ACTIVITY', payload: id });
     notify('Activity approved.', 'success');
   };
   
@@ -173,17 +147,12 @@ const TaskManager: React.FC = () => {
     const now = new Date().toISOString();
     const isEditing = activityToSave.id && activityToSave.createdAt;
 
-    // EDITING: The activity has an ID and createdAt timestamp.
     if (isEditing) {
-        const updatedActivity = { 
-            ...activityToSave, 
-            updatedAt: now 
-        };
+        const updatedActivity = { ...activityToSave, updatedAt: now };
         delete updatedActivity.memberIds;
-        setActivities(prev => prev.map(a => a.id === updatedActivity.id ? updatedActivity : a));
+        dispatch({ type: 'UPDATE_ACTIVITY', payload: updatedActivity });
         notify('Activity updated successfully!', 'success');
     } 
-    // CREATING: No ID, but has a memberIds array.
     else if (activityToSave.memberIds && activityToSave.memberIds.length > 0) {
         const { memberIds, ...baseActivityData } = activityToSave;
         
@@ -191,14 +160,13 @@ const TaskManager: React.FC = () => {
             ...baseActivityData,
             id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             memberId: memberId,
-            status: 'Pending', // New activities are always pending
+            status: 'Pending',
             createdAt: now,
             updatedAt: now,
         }));
-        setActivities(prev => [...prev, ...newActivities]);
+        dispatch({ type: 'ADD_ACTIVITIES', payload: newActivities });
         notify(`${newActivities.length} new activity log(s) created!`, 'success');
         
-        // THE FIX: Reset filters to guarantee the new item is visible.
         setActivitySearchTerm('');
         setActivityFilterMember('');
     }
@@ -209,14 +177,12 @@ const TaskManager: React.FC = () => {
   
   const handleProjectFilterChange = (projectId: string) => {
     setSelectedProjectId(projectId);
-    // Reset activity filters when project changes to avoid confusion
     setActivitySearchTerm('');
     setActivityFilterMember('');
   };
 
   const renderContent = () => {
     const projectOptions = [{ value: '', label: 'All Projects' }, ...projects.map(p => ({ value: p.id, label: p.projectTitle }))];
-
     const filteredTasks = tasks.filter(task => !selectedProjectId || task.projectId === selectedProjectId);
 
     return (

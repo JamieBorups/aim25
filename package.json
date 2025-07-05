@@ -1,5 +1,5 @@
 {
-  "name": "copy-of-july-4---in-kind---part-6---restart--of-the-arts-incubator",
+  "name": "july-5---modifications---the-arts-incubator",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,16 +9,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "html2canvas": "1.4.1",
+    "react-dom": "^19.1.0",
+    "react": "^19.1.0",
     "jspdf": "2.5.1",
     "jspdf-autotable": "3.8.2",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
+    "html2canvas": "1.4.1",
     "react-hot-toast": "2.4.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "typescript": "~5.7.2",
-    "vite": "^6.3.5"
+    "vite": "^6.2.0"
   }
 }
