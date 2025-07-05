@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo } from 'react';
 import { FormData, Task, Activity, TaskStatus, ActivityStatus, TaskSortOption, SortDirection, TaskStatusFilter } from '../../types';
 import { useAppContext } from '../../context/AppContext';
@@ -8,9 +9,9 @@ import ActivityEditor from '../task/ActivityEditor';
 import ConfirmationModal from '../ui/ConfirmationModal';
 import { Select } from '../ui/Select';
 
-const getTaskStatusBadge = (status: TaskStatus) => {
+const getTaskStatusBadge = (status: TaskStatus | string) => {
     const baseClasses = "px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full";
-    const statusMap = {
+    const statusMap: Record<string, string> = {
         'Done': "bg-green-100 text-green-800",
         'In Progress': "bg-blue-100 text-blue-800",
         'To Do': "bg-yellow-100 text-yellow-800",
@@ -21,7 +22,7 @@ const getTaskStatusBadge = (status: TaskStatus) => {
 
 const getActivityStatusBadge = (status: ActivityStatus) => {
     const baseClasses = "px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full";
-    const statusMap = {
+    const statusMap: Record<ActivityStatus, string> = {
         'Approved': "bg-green-100 text-green-800",
         'Pending': "bg-yellow-100 text-yellow-800",
     };

@@ -1,7 +1,8 @@
 
+
 import React from 'react';
 
-export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData';
+export type Page = 'home' | 'projects' | 'members' | 'tasks' | 'reports' | 'sampleData' | 'detailedSampleData' | 'settings';
 export type TabId = 'projectInfo' | 'collaborators' | 'budget';
 export type ProjectViewTabId = 'info' | 'collaborators' | 'budget' | 'workplan' | 'insights';
 export type TaskManagerView = 'workplan' | 'tasks' | 'activities';
@@ -40,7 +41,7 @@ export interface Member {
 export interface FormData {
     id: string;
     projectTitle: string;
-    status: ProjectStatus;
+    status: ProjectStatus | string; // Can be custom now
     artisticDisciplines: string[];
     craftGenres: string[];
     danceGenres: string[];
@@ -119,7 +120,7 @@ export interface Task {
     title: string;
     description: string;
     assignedMemberId: string;
-    status: TaskStatus;
+    status: TaskStatus | string; // Can be custom now
     startDate: string;
     dueDate: string;
     taskType: TaskType;
@@ -202,6 +203,49 @@ export interface FormFieldProps<T> {
   ariaLabel?: string;
 }
 
+
+// --- Settings ---
+export type SettingsCategory = 'general' | 'projects' | 'members' | 'tasks' | 'ai' | 'budget';
+export interface CustomStatus { id: string; label: string; color: string; }
+export interface CustomDiscipline { id: string; name: string; genres: { id: string; name: string }[]; }
+export interface CustomRole { id: string; name: string; }
+export interface CustomTaskStatus { id: string; name: string; color: string; }
+
+export interface AppSettings {
+  general: {
+    collectiveName: string;
+    defaultCurrency: 'CAD' | 'USD' | 'EUR';
+    dateFormat: 'YYYY-MM-DD' | 'MM/DD/YYYY' | 'DD/MM/YYYY';
+  };
+  projects: {
+    statuses: CustomStatus[];
+    disciplines: CustomDiscipline[];
+  };
+  members: {
+    roles: CustomRole[];
+    availability: CustomRole[];
+  };
+  tasks: {
+    statuses: CustomTaskStatus[];
+    defaultWorkTypes: {
+      paidRate: number;
+      inKindRate: number;
+      volunteerRate: number;
+    };
+    workWeek: string[];
+  };
+  budget: {
+    revenueLabels: Record<string, string>;
+    expenseLabels: Record<string, string>;
+  };
+  ai: {
+    enabled: boolean;
+    model: string;
+    quality: 'fastest' | 'balanced' | 'highest';
+    systemInstruction: string;
+  };
+}
+
 // --- Reducer State & Actions ---
 export interface AppState {
     projects: FormData[];
@@ -210,12 +254,13 @@ export interface AppState {
     activities: Activity[];
     directExpenses: DirectExpense[];
     reports: Report[];
+    settings: AppSettings;
     reportProjectIdToOpen: string | null;
 }
 
 export type Action =
   | { type: 'SET_PROJECTS'; payload: FormData[] }
-  | { type: 'UPDATE_PROJECT_STATUS'; payload: { projectId: string; status: ProjectStatus } }
+  | { type: 'UPDATE_PROJECT_STATUS'; payload: { projectId: string; status: ProjectStatus | string } }
   | { type: 'DELETE_PROJECT'; payload: string }
   | { type: 'SET_MEMBERS'; payload: Member[] }
   | { type: 'DELETE_MEMBER'; payload: string }
@@ -231,9 +276,10 @@ export type Action =
   | { type: 'SET_DIRECT_EXPENSES'; payload: DirectExpense[] }
   | { type: 'ADD_DIRECT_EXPENSE'; payload: DirectExpense }
   | { type: 'SET_REPORTS'; payload: Report[] }
+  | { type: 'UPDATE_SETTINGS'; payload: AppSettings }
   | { type: 'SET_REPORT_PROJECT_ID_TO_OPEN'; payload: string | null }
   | { type: 'CLEAR_ALL_DATA' }
-  | { type: 'LOAD_DATA'; payload: Omit<AppState, 'reportProjectIdToOpen'> };
+  | { type: 'LOAD_DATA'; payload: Omit<Partial<AppState>, 'reportProjectIdToOpen'> };
 
 
 // --- App Context Type ---

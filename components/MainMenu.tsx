@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Page } from '../types';
+import { useAppContext } from '../context/AppContext';
 
 interface MainMenuProps {
     activePage: Page;
@@ -65,6 +66,9 @@ const DropdownLink: React.FC<{
 const MainMenu: React.FC<MainMenuProps> = ({ activePage, onNavigate }) => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const { state } = useAppContext();
+    const collectiveName = state.settings.general.collectiveName || 'The Arts Incubator';
+
 
      useEffect(() => {
       function handleClickOutside(event: MouseEvent) {
@@ -85,7 +89,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ activePage, onNavigate }) => {
                 <div className="flex items-center justify-between h-16">
                     <div className="flex items-center">
                         <div className="flex-shrink-0">
-                            <h1 className="text-xl font-bold tracking-wider">The Arts Incubator</h1>
+                            <h1 className="text-xl font-bold tracking-wider">{collectiveName}</h1>
                         </div>
                         <nav className="hidden md:block">
                             <div className="ml-10 flex items-baseline space-x-4">
@@ -94,6 +98,7 @@ const MainMenu: React.FC<MainMenuProps> = ({ activePage, onNavigate }) => {
                                <NavLink page="members" label="Members" activePage={activePage} onNavigate={onNavigate} />
                                <NavLink page="tasks" label="Task Management" activePage={activePage} onNavigate={onNavigate} />
                                <NavLink page="reports" label="Reports" activePage={activePage} onNavigate={onNavigate} />
+                               <NavLink page="settings" label="Settings" activePage={activePage} onNavigate={onNavigate} />
                             </div>
                         </nav>
                     </div>

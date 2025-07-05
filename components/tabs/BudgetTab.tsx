@@ -1,13 +1,15 @@
 
 
 
-import React, { useState } from 'react';
+
+import React, { useState, useMemo, useCallback } from 'react';
 import { produce } from 'https://esm.sh/immer';
 import { FormData, BudgetItem, BudgetItemStatus } from '../../types';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { EXPENSE_FIELDS, REVENUE_FIELDS, BUDGET_ITEM_STATUS_OPTIONS } from '../../constants';
 import { useBudgetCalculations } from '../../hooks/useBudgetCalculations';
+import { useAppContext } from '../../context/AppContext';
 
 interface Props {
   formData: FormData;
@@ -158,6 +160,21 @@ const BudgetSection: React.FC<{ title: string, children: React.ReactNode, instru
 
 
 const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
+    const { state: { settings } } = useAppContext();
+    const { revenueLabels, expenseLabels } = settings.budget;
+
+    const allRevenueFields = useMemo(() => Object.values(REVENUE_FIELDS).flat(), []);
+    const allExpenseFields = useMemo(() => Object.values(EXPENSE_FIELDS).flat(), []);
+
+    const getRevenueLabel = useCallback((key: string, defaultLabel: string) => {
+        const customLabel = revenueLabels[key];
+        return (customLabel !== undefined && customLabel !== '') ? customLabel : defaultLabel;
+    }, [revenueLabels]);
+
+    const getExpenseLabel = useCallback((key: string, defaultLabel: string) => {
+        const customLabel = expenseLabels[key];
+        return (customLabel !== undefined && customLabel !== '') ? customLabel : defaultLabel;
+    }, [expenseLabels]);
     
     const handleBudgetChange = (path: (string | number)[], value: any) => {
         const newFormData = produce(formData, draft => {
@@ -210,7 +227,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Revenue: Grants" total={totalGrants}>
                 <BudgetCategoryManager
                     items={budget.revenues.grants}
-                    options={REVENUE_FIELDS.grants.map(f => ({ value: f.key, label: f.label }))}
+                    options={REVENUE_FIELDS.grants.map(f => ({ value: f.key, label: getRevenueLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'grants'], items)}
                     isRevenue={true}
                 />
@@ -241,7 +258,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Revenue: Sales" total={totalSales}>
                  <BudgetCategoryManager
                     items={budget.revenues.sales}
-                    options={REVENUE_FIELDS.sales.map(f => ({ value: f.key, label: f.label }))}
+                    options={REVENUE_FIELDS.sales.map(f => ({ value: f.key, label: getRevenueLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'sales'], items)}
                     isRevenue={true}
                 />
@@ -250,7 +267,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Revenue: Fundraising" total={totalFundraising}>
                  <BudgetCategoryManager
                     items={budget.revenues.fundraising}
-                    options={REVENUE_FIELDS.fundraising.map(f => ({ value: f.key, label: f.label }))}
+                    options={REVENUE_FIELDS.fundraising.map(f => ({ value: f.key, label: getRevenueLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'fundraising'], items)}
                     isRevenue={true}
                 />
@@ -259,7 +276,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Revenue: Contributions" total={totalContributions}>
                  <BudgetCategoryManager
                     items={budget.revenues.contributions}
-                    options={REVENUE_FIELDS.contributions.map(f => ({ value: f.key, label: f.label }))}
+                    options={REVENUE_FIELDS.contributions.map(f => ({ value: f.key, label: getRevenueLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['revenues', 'contributions'], items)}
                     isRevenue={true}
                 />
@@ -274,7 +291,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Expenses: Professional fees/honorariums" total={totalProfessionalFees}>
                  <BudgetCategoryManager
                     items={budget.expenses.professionalFees}
-                    options={EXPENSE_FIELDS.professionalFees.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.professionalFees.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'professionalFees'], items)}
                 />
             </BudgetSection>
@@ -292,7 +309,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             }>
                 <BudgetCategoryManager
                     items={budget.expenses.travel}
-                    options={EXPENSE_FIELDS.travel.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.travel.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'travel'], items)}
                 />
             </BudgetSection>
@@ -300,7 +317,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Expenses: Production and publication costs" total={totalProduction}>
                 <BudgetCategoryManager
                     items={budget.expenses.production}
-                    options={EXPENSE_FIELDS.production.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.production.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'production'], items)}
                 />
             </BudgetSection>
@@ -308,7 +325,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Expenses: Administration" total={totalAdministration}>
                 <BudgetCategoryManager
                     items={budget.expenses.administration}
-                    options={EXPENSE_FIELDS.administration.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.administration.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'administration'], items)}
                 />
             </BudgetSection>
@@ -316,7 +333,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Expenses: Research" total={totalResearch}>
                  <BudgetCategoryManager
                     items={budget.expenses.research}
-                    options={EXPENSE_FIELDS.research.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.research.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'research'], items)}
                 />
             </BudgetSection>
@@ -324,7 +341,7 @@ const BudgetTab: React.FC<Props> = ({ formData, onChange }) => {
             <BudgetSection title="Expenses: Professional development" total={totalProfessionalDevelopment}>
                 <BudgetCategoryManager
                     items={budget.expenses.professionalDevelopment}
-                    options={EXPENSE_FIELDS.professionalDevelopment.map(f => ({ value: f.key, label: f.label }))}
+                    options={EXPENSE_FIELDS.professionalDevelopment.map(f => ({ value: f.key, label: getExpenseLabel(f.key, f.label) }))}
                     onChange={items => handleBudgetCategoryChange(['expenses', 'professionalDevelopment'], items)}
                 />
             </BudgetSection>

@@ -14,9 +14,9 @@ interface TaskListProps {
   selectedProjectId: string;
 }
 
-const getStatusBadge = (status: TaskStatus) => {
+const getStatusBadge = (status: TaskStatus | string) => {
     const baseClasses = "px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full";
-    const statusMap = {
+    const statusMap: Record<string, string> = {
         'Done': "bg-green-100 text-green-800",
         'In Progress': "bg-blue-100 text-blue-800",
         'To Do': "bg-yellow-100 text-yellow-800",

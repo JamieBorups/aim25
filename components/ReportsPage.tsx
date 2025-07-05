@@ -1,4 +1,7 @@
 
+
+
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { produce } from 'https://esm.sh/immer';
 import { FormData, Member, Task, Report, ReportHighlight, Activity, DirectExpense } from '../types';
@@ -46,7 +49,7 @@ const IMPACT_QUESTIONS = [
     { id: 'q8', label: 'This grant made it possible to build relationships with new collaborators' },
     { id: 'q9', label: 'This grant created further artistic opportunities for me', instructions: 'Consider, for instance: Were any meaningful connections developed with other artists or organizations? Did you gain access to additional funding and/or other resources?' },
     { id: 'q10', label: 'This project created new opportunities for the participants involved', instructions: 'Consider, for instance: increased ability for creative self-expression, access to new skills' },
-    { id: 'q11', label: 'This project created new opportunities for the community in which it took place', instructions: 'Consider, for instance: providing a voice to underserved and/or marginalized communities; providing an artistic outlet to communities facing a barrier, creating a platform for meaningful community exchange and engagement, strengthening community bonds' },
+    { id: 'q11', label: 'This project created new opportunities for the community in which it took place', instructions: 'Consider, for instance: providing a voice to an underserved and/or marginalized communities; providing an artistic outlet to communities facing a barrier, creating a platform for meaningful community exchange and engagement, strengthening community bonds' },
 ];
 
 const IMPACT_OPTIONS = [
@@ -78,7 +81,7 @@ const ReportField: React.FC<{ label?: string, instructions?: React.ReactNode, ch
 
 const ReportsPage: React.FC = () => {
   const { state, dispatch, notify } = useAppContext();
-  const { projects, members, tasks, activities, directExpenses, reports, reportProjectIdToOpen } = state;
+  const { projects, members, tasks, activities, directExpenses, reports, reportProjectIdToOpen, settings } = state;
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [isEditing, setIsEditing] = useState(false);
   const [reportData, setReportData] = useState<Report | null>(null);
@@ -129,11 +132,18 @@ const ReportsPage: React.FC = () => {
   }, [reportProjectIdToOpen, dispatch]);
 
   useEffect(() => {
-    if (!selectedProjectId || !selectedProject) {
-        setReportData(null);
-        setIsEditing(false);
-        setTempReportData(null);
-        return;
+    if (!selectedProjectId) {
+      setReportData(null);
+      setIsEditing(false);
+      setTempReportData(null);
+      return;
+    }
+    
+    const projectForReport = projects.find(p => p.id === selectedProjectId);
+    if (!projectForReport) {
+      // This can happen if projects are still loading or ID is invalid
+      setReportData(null);
+      return;
     }
 
     const existingReport = reports.find(r => r.projectId === selectedProjectId);
@@ -144,13 +154,13 @@ const ReportsPage: React.FC = () => {
             ...initialReportData,
             id: `rep_${selectedProjectId}`,
             projectId: selectedProjectId,
-            projectResults: selectedProject.projectDescription || '',
+            projectResults: projectForReport.projectDescription || '',
         };
         setReportData(newReport);
     }
     setIsEditing(false);
     setTempReportData(null);
-  }, [selectedProjectId, selectedProject, reports]);
+  }, [selectedProjectId, projects, reports]);
   
   const handleEdit = () => {
     setTempReportData(reportData);
@@ -226,7 +236,7 @@ const ReportsPage: React.FC = () => {
             IMPACT_OPTIONS,
             PEOPLE_INVOLVED_OPTIONS,
             GRANT_ACTIVITIES_OPTIONS,
-        });
+        }, settings);
     } catch (error) {
         console.error("Failed to generate PDF:", error);
         notify("An error occurred while generating the PDF. Please try again.", 'error');
@@ -235,21 +245,27 @@ const ReportsPage: React.FC = () => {
     }
   };
 
-  const completedProjects = useMemo(() => projects.filter(p => p.status === 'Completed'), [projects]);
+  const projectOptions = useMemo(() => {
+    return projects.map(p => ({
+        value: p.id,
+        label: `${p.projectTitle} [${p.status}]`
+    }));
+  }, [projects]);
+
 
   return (
     <div className="bg-white shadow-lg rounded-xl p-6 sm:p-8">
         <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
-            <h1 className="text-3xl font-bold text-slate-900">Final Reports</h1>
+            <h1 className="text-3xl font-bold text-slate-900">Reports</h1>
             <div className="w-full max-w-sm">
-                <FormField label="Select a Completed Project to View/Edit Report" htmlFor="report_project_select" className="mb-0">
+                <FormField label="Select a Project to View/Generate Report" htmlFor="report_project_select" className="mb-0">
                     <Select
                         id="report_project_select"
                         value={selectedProjectId}
                         onChange={e => setSelectedProjectId(e.target.value)}
                         options={[
                             { value: '', label: 'Select a project...' },
-                            ...completedProjects.map(p => ({ value: p.id, label: p.projectTitle }))
+                            ...projectOptions
                         ]}
                     />
                 </FormField>
@@ -260,7 +276,7 @@ const ReportsPage: React.FC = () => {
             <div className="text-center py-20">
                 <i className="fa-solid fa-file-invoice text-7xl text-slate-300"></i>
                 <h3 className="mt-6 text-xl font-medium text-slate-800">No Project Selected</h3>
-                <p className="text-slate-500 mt-2 text-base">Please select a completed project from the dropdown above to view its final report.</p>
+                <p className="text-slate-500 mt-2 text-base">Please select a project from the dropdown above to view its report.</p>
             </div>
         ) : !reportData ? (
              <div className="text-center py-20">
@@ -302,7 +318,7 @@ const ReportsPage: React.FC = () => {
                         <ReportField label="Briefly describe how you spent the grant.">
                              <TextareaWithCounter wordLimit={300} rows={5} value={isEditing ? tempReportData?.grantSpendingDescription : reportData.grantSpendingDescription} onChange={e => handleTempReportChange('grantSpendingDescription', e.target.value)} disabled={!isEditing} />
                         </ReportField>
-                        <ReportBudgetView project={selectedProject} actuals={actuals} />
+                        <ReportBudgetView project={selectedProject} actuals={actuals} settings={settings} />
                     </ReportSection>
 
                     <ReportSection title="Workplan">

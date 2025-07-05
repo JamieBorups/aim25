@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { FormData, Member, Task, Report } from '../types';
+import { AppSettings, FormData, Member, Task, Report } from '../types';
 import { EXPENSE_FIELDS } from '../constants';
 
 interface PdfOptions {
@@ -16,9 +16,13 @@ export const generateReportPdf = async (
     members: Member[], 
     tasks: Task[], 
     actuals: Map<string, number>,
-    options: PdfOptions
+    options: PdfOptions,
+    settings: AppSettings
 ) => {
     const { IMPACT_QUESTIONS, IMPACT_OPTIONS, PEOPLE_INVOLVED_OPTIONS, GRANT_ACTIVITIES_OPTIONS } = options;
+    const { expenseLabels } = settings.budget;
+
+    const expenseFieldMap = new Map(Object.values(EXPENSE_FIELDS).flat().map(f => [f.key, (expenseLabels[f.key] !== undefined && expenseLabels[f.key] !== '') ? expenseLabels[f.key] : f.label]));
 
     const doc = new jsPDF('p', 'pt', 'a4');
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -133,11 +137,10 @@ export const generateReportPdf = async (
         if (y + 60 > pageHeight - margin) addPage();
         y = drawText(`Expenses: ${category.title}`, margin, y + 10, { fontSize: 12, fontStyle: 'bold' });
         
-        const fieldMap = new Map(category.fields.map(f => [f.key, f.label]));
         const tableBody = category.items.map(item => {
             const actualAmount = actuals.get(item.id) || 0;
             return [
-                fieldMap.get(item.source) || item.source,
+                expenseFieldMap.get(item.source) || item.source,
                 item.description,
                 formatCurrency(item.amount),
                 formatCurrency(actualAmount),

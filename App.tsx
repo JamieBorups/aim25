@@ -8,6 +8,7 @@ import TaskManager from './TaskManager';
 import ReportsPage from './components/ReportsPage';
 import SampleData from './components/SampleData';
 import DetailedSampleData from './components/DetailedSampleData';
+import SettingsManager from './components/settings/SettingsManager';
 import { Page } from './types';
 
 const App: React.FC = () => {
@@ -23,6 +24,7 @@ const App: React.FC = () => {
         {activePage === 'reports' && <ReportsPage />}
         {activePage === 'sampleData' && <SampleData />}
         {activePage === 'detailedSampleData' && <DetailedSampleData />}
+        {activePage === 'settings' && <SettingsManager />}
       </Layout>
     </AppProvider>
   );

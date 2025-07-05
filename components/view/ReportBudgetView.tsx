@@ -1,7 +1,9 @@
 
 
-import React from 'react';
-import { FormData, BudgetItem } from '../../types';
+
+
+import React, { useMemo } from 'react';
+import { AppSettings, FormData, BudgetItem } from '../../types';
 import { useBudgetCalculations } from '../../hooks/useBudgetCalculations';
 import { REVENUE_FIELDS, EXPENSE_FIELDS } from '../../constants';
 
@@ -13,6 +15,7 @@ const formatCurrency = (value: number | undefined | null) => {
 interface ReportBudgetViewProps {
     project: FormData;
     actuals: Map<string, number>;
+    settings: AppSettings;
 }
 
 const ReportSection: React.FC<{title: string, className?: string}> = ({title, className=""}) => (
@@ -48,14 +51,25 @@ const GenericTable: React.FC<{headers: string[], rows: (string|number|React.Reac
     </div>
 );
 
-const ReportBudgetView: React.FC<ReportBudgetViewProps> = ({ project, actuals }) => {
+const ReportBudgetView: React.FC<ReportBudgetViewProps> = ({ project, actuals, settings }) => {
     const budget = project.budget;
+    const { revenueLabels, expenseLabels } = settings.budget;
+
+    const revenueFieldMap = useMemo(() => {
+        const allFields = Object.values(REVENUE_FIELDS).flat();
+        return new Map(allFields.map(f => [f.key, (revenueLabels[f.key] !== undefined && revenueLabels[f.key] !== '') ? revenueLabels[f.key] : f.label]));
+    }, [revenueLabels]);
+    
+    const expenseFieldMap = useMemo(() => {
+        const allFields = Object.values(EXPENSE_FIELDS).flat();
+        return new Map(allFields.map(f => [f.key, (expenseLabels[f.key] !== undefined && expenseLabels[f.key] !== '') ? expenseLabels[f.key] : f.label]));
+    }, [expenseLabels]);
+
     const { totalRevenue, totalExpenses, projectedAudience, totalTickets } = useBudgetCalculations(budget);
     const totalActualExpenses = Array.from(actuals.values()).reduce((sum, val) => sum + val, 0);
     const getActual = (id: string) => actuals.get(id) || 0;
 
-    const renderRows = (items: BudgetItem[], fields: { key: string, label: string }[], showDescription: boolean = true) => {
-        const fieldMap = new Map(fields.map(f => [f.key, f.label]));
+    const renderRows = (items: BudgetItem[], fieldMap: Map<string, string>, showDescription: boolean = true) => {
         return items.map(item => {
             const projectedAmount = item.amount || 0;
             const actualAmount = getActual(item.id);
@@ -85,7 +99,7 @@ const ReportBudgetView: React.FC<ReportBudgetViewProps> = ({ project, actuals })
                 />
                 
                 <ReportSection title="Revenue: Grants" />
-                <GenericTable headers={["", "Requested", "Awarded", "Description"]} rows={renderRows(budget.revenues.grants, REVENUE_FIELDS.grants)} />
+                <GenericTable headers={["", "Requested", "Awarded", "Description"]} rows={renderRows(budget.revenues.grants, revenueFieldMap)} />
                 
                 <ReportSection title="Revenue: Tickets and box office" />
                 <GenericTable
@@ -99,35 +113,35 @@ const ReportBudgetView: React.FC<ReportBudgetViewProps> = ({ project, actuals })
                 </div>
 
                 <ReportSection title="Revenue: Sales" />
-                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.sales, REVENUE_FIELDS.sales)} />
+                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.sales, revenueFieldMap)} />
                 
                 <ReportSection title="Revenue: Fundraising" />
-                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.fundraising, REVENUE_FIELDS.fundraising)} />
+                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.fundraising, revenueFieldMap)} />
 
                 <ReportSection title="Revenue: Contributions" />
-                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.contributions, REVENUE_FIELDS.contributions)} />
+                <GenericTable headers={['Source', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.revenues.contributions, revenueFieldMap)} />
                 
                 <div className="mt-4">
                     <GenericTable headers={['', 'Projected', 'Actual']} rows={[['Total revenues', formatCurrency(totalRevenue), formatCurrency(totalRevenue)]]} isTotal />
                 </div>
 
                 <ReportSection title="Expenses: Professional fees and honorariums" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.professionalFees, EXPENSE_FIELDS.professionalFees)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.professionalFees, expenseFieldMap)} />
                 
                 <ReportSection title="Expenses: Travel" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.travel, EXPENSE_FIELDS.travel)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.travel, expenseFieldMap)} />
                 
                 <ReportSection title="Expenses: Production and publication costs" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.production, EXPENSE_FIELDS.production)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.production, expenseFieldMap)} />
 
                 <ReportSection title="Expenses: Administration" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.administration, EXPENSE_FIELDS.administration)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual', 'Description']} rows={renderRows(budget.expenses.administration, expenseFieldMap)} />
 
                 <ReportSection title="Expenses: Research" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual']} rows={renderRows(budget.expenses.research, EXPENSE_FIELDS.research, false)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual']} rows={renderRows(budget.expenses.research, expenseFieldMap, false)} />
                 
                 <ReportSection title="Expenses: Professional development" />
-                <GenericTable headers={['Expense Item', 'Projected', 'Actual']} rows={renderRows(budget.expenses.professionalDevelopment, EXPENSE_FIELDS.professionalDevelopment, false)} />
+                <GenericTable headers={['Expense Item', 'Projected', 'Actual']} rows={renderRows(budget.expenses.professionalDevelopment, expenseFieldMap, false)} />
 
                 <div className="mt-4">
                     <GenericTable headers={['', 'Projected', 'Actual']} rows={[['Total expenses', formatCurrency(totalExpenses), formatCurrency(totalActualExpenses)]]} isTotal/>

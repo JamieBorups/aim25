@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useMemo, useState } from 'react';
 import { produce } from 'https://esm.sh/immer';
 import { DetailedBudget, BudgetItem, Task, Activity, DirectExpense, ExpenseCategoryType, FormData, BudgetItemStatus } from '../../types';
@@ -71,12 +73,12 @@ const RevenueCategoryItemsView: React.FC<{
     categoryPath: (string|number)[], 
     onUpdateRevenue: (path: (string | number)[], value: number) => void, 
     onSetEditingRevenueId: (id: string | null) => void, 
-    editingRevenueId: string | null 
-}> = ({ items, categoryPath, onUpdateRevenue, onSetEditingRevenueId, editingRevenueId }) => {
+    editingRevenueId: string | null,
+    fieldMap: Map<string, string>
+}> = ({ items, categoryPath, onUpdateRevenue, onSetEditingRevenueId, editingRevenueId, fieldMap }) => {
     if (!items || items.length === 0) {
         return <p className="text-sm text-slate-400 italic py-2">No items in this category.</p>;
     }
-    const fieldMap = new Map(Object.values(REVENUE_FIELDS).flat().map(f => [f.key, f.label]));
     
     return (
         <div className="space-y-1">
@@ -132,7 +134,19 @@ const RevenueCategoryItemsView: React.FC<{
 
 const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activities, directExpenses }) => {
     const { dispatch, state } = useAppContext();
-    const { members } = state;
+    const { members, settings } = state;
+    const { revenueLabels, expenseLabels } = settings.budget;
+
+    const revenueFieldMap = useMemo(() => {
+        const allFields = Object.values(REVENUE_FIELDS).flat();
+        return new Map(allFields.map(f => [f.key, (revenueLabels[f.key] !== undefined && revenueLabels[f.key] !== '') ? revenueLabels[f.key] : f.label]));
+    }, [revenueLabels]);
+    
+    const expenseFieldMap = useMemo(() => {
+        const allFields = Object.values(EXPENSE_FIELDS).flat();
+        return new Map(allFields.map(f => [f.key, (expenseLabels[f.key] !== undefined && expenseLabels[f.key] !== '') ? expenseLabels[f.key] : f.label]));
+    }, [expenseLabels]);
+
     const budget = project.budget;
     const [expenseModalState, setExpenseModalState] = useState<{isOpen: boolean, category?: ExpenseCategoryType}>({isOpen: false});
     const [editingRevenueId, setEditingRevenueId] = useState<string | null>(null);
@@ -195,7 +209,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
         dispatch({ type: 'ADD_DIRECT_EXPENSE', payload: expense });
     };
     
-    const ExpenseCategoryView: React.FC<{title: string; categoryKey: ExpenseCategoryType; items: BudgetItem[]; fields: {key: string, label: string}[]}> = ({ title, categoryKey, items, fields }) => {
+    const ExpenseCategoryView: React.FC<{title: string; categoryKey: ExpenseCategoryType; items: BudgetItem[]}> = ({ title, categoryKey, items }) => {
         const categoryTotalBudgeted = items.reduce((sum, item) => sum + (item.amount || 0), 0);
         const categoryTotalActual = items.reduce((sum, item) => {
             const actual = actualsByBudgetItem.get(item.id);
@@ -204,7 +218,6 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
         const categoryVariance = categoryTotalBudgeted - categoryTotalActual;
 
         if (items.length === 0) return null;
-        const fieldMap = new Map(fields.map(f => [f.key, f.label]));
 
         return (
             <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm mt-6">
@@ -224,7 +237,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                 {items.map(item => {
                     const actual = actualsByBudgetItem.get(item.id) || { cost: 0, hours: 0 };
                     const variance = item.amount - actual.cost;
-                    const label = fieldMap.get(item.source) || item.source;
+                    const label = expenseFieldMap.get(item.source) || item.source;
                     return (
                         <div key={item.id} className="grid grid-cols-10 gap-4 items-center py-1.5 border-b border-slate-100 last:border-b-0 px-2 rounded group">
                             <div className="col-span-4 text-sm">
@@ -265,13 +278,13 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
         const budgetItemOptions = useMemo(() => {
             if (!category) return [];
             return budget.expenses[category].map(item => {
-                const sourceLabel = EXPENSE_FIELDS[category].find(f => f.key === item.source)?.label || item.source;
+                const sourceLabel = expenseFieldMap.get(item.source) || item.source;
                 return {
                     value: item.id,
                     label: item.description ? `${sourceLabel}: ${item.description}` : sourceLabel
                 };
             });
-        }, [category]);
+        }, [category, expenseFieldMap]);
 
         const handleSubmit = (e: React.FormEvent) => {
             e.preventDefault();
@@ -407,6 +420,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                             onUpdateRevenue={handleUpdateRevenue}
                             editingRevenueId={editingRevenueId}
                             onSetEditingRevenueId={setEditingRevenueId}
+                            fieldMap={revenueFieldMap}
                         />
                     </RevenueSection>
                     
@@ -445,6 +459,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                             onUpdateRevenue={handleUpdateRevenue}
                             editingRevenueId={editingRevenueId}
                             onSetEditingRevenueId={setEditingRevenueId}
+                            fieldMap={revenueFieldMap}
                         />
                     </RevenueSection>
                     <RevenueSection title="Fundraising" budgetTotal={budgetCalculations.totalFundraising} actualTotal={budget.revenues.fundraising.reduce((s,i)=>s+(i.actualAmount||0),0)}>
@@ -454,6 +469,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                             onUpdateRevenue={handleUpdateRevenue}
                             editingRevenueId={editingRevenueId}
                             onSetEditingRevenueId={setEditingRevenueId}
+                            fieldMap={revenueFieldMap}
                         />
                     </RevenueSection>
                     <RevenueSection title="Contributions" budgetTotal={budgetCalculations.totalContributions} actualTotal={budget.revenues.contributions.reduce((s,i)=>s+(i.actualAmount||0),0)}>
@@ -463,6 +479,7 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                             onUpdateRevenue={handleUpdateRevenue}
                             editingRevenueId={editingRevenueId}
                             onSetEditingRevenueId={setEditingRevenueId}
+                            fieldMap={revenueFieldMap}
                         />
                     </RevenueSection>
                      <div className="bg-teal-600 text-white p-4 rounded-lg flex justify-between items-center font-bold text-lg mt-6 shadow-md">
@@ -479,12 +496,12 @@ const BudgetView: React.FC<BudgetViewProps> = ({ project, onSave, tasks, activit
                            <i className="fa-solid fa-plus mr-2"></i>Log Top-Level Expense
                         </button>
                     </div>
-                    <ExpenseCategoryView title="Professional Fees" categoryKey="professionalFees" items={budget.expenses.professionalFees} fields={EXPENSE_FIELDS.professionalFees} />
-                    <ExpenseCategoryView title="Travel" categoryKey="travel" items={budget.expenses.travel} fields={EXPENSE_FIELDS.travel} />
-                    <ExpenseCategoryView title="Production & Publication" categoryKey="production" items={budget.expenses.production} fields={EXPENSE_FIELDS.production} />
-                    <ExpenseCategoryView title="Administration" categoryKey="administration" items={budget.expenses.administration} fields={EXPENSE_FIELDS.administration} />
-                    <ExpenseCategoryView title="Research" categoryKey="research" items={budget.expenses.research} fields={EXPENSE_FIELDS.research} />
-                    <ExpenseCategoryView title="Professional Development" categoryKey="professionalDevelopment" items={budget.expenses.professionalDevelopment} fields={EXPENSE_FIELDS.professionalDevelopment} />
+                    <ExpenseCategoryView title="Professional Fees" categoryKey="professionalFees" items={budget.expenses.professionalFees} />
+                    <ExpenseCategoryView title="Travel" categoryKey="travel" items={budget.expenses.travel} />
+                    <ExpenseCategoryView title="Production & Publication" categoryKey="production" items={budget.expenses.production} />
+                    <ExpenseCategoryView title="Administration" categoryKey="administration" items={budget.expenses.administration} />
+                    <ExpenseCategoryView title="Research" categoryKey="research" items={budget.expenses.research} />
+                    <ExpenseCategoryView title="Professional Development" categoryKey="professionalDevelopment" items={budget.expenses.professionalDevelopment} />
                      <div className="bg-rose-600 text-white p-4 rounded-lg flex justify-between items-center font-bold text-lg mt-6 shadow-md">
                         <span>Total Expenses (Budgeted)</span>
                         <span>{formatCurrency(budgetCalculations.totalExpenses)}</span>

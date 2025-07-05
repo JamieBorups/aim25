@@ -1,7 +1,7 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { FormData, ProjectStatus } from '../types';
 import { PROJECT_STATUS_OPTIONS } from '../constants';
+import { useAppContext } from '../context/AppContext';
 
 interface ProjectListProps {
   projects: FormData[];
@@ -9,19 +9,30 @@ interface ProjectListProps {
   onEditProject: (id: string) => void;
   onDeleteProject: (id: string) => void;
   onViewProject: (id: string) => void;
-  onUpdateProjectStatus: (id: string, status: ProjectStatus) => void;
+  onUpdateProjectStatus: (id: string, status: ProjectStatus | string) => void;
 }
 
-const StatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
-    const statusStyles: Record<ProjectStatus, string> = {
+const StatusBadge: React.FC<{ status: ProjectStatus | string }> = ({ status }) => {
+    const { state } = useAppContext();
+    const defaultStatusStyles: Record<ProjectStatus, string> = {
         'Active': 'bg-green-100 text-green-800',
         'On Hold': 'bg-yellow-100 text-yellow-800',
         'Completed': 'bg-blue-100 text-blue-800',
         'Pending': 'bg-slate-100 text-slate-800',
         'Terminated': 'bg-rose-100 text-rose-800',
     };
+    
+    const customStatus = state.settings.projects.statuses.find(s => s.label === status);
+    
+    let style = 'bg-gray-100 text-gray-800'; // Default fallback
+    if (customStatus) {
+        style = customStatus.color;
+    } else if (status in defaultStatusStyles) {
+        style = defaultStatusStyles[status as ProjectStatus];
+    }
+    
     return (
-        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusStyles[status] || 'bg-slate-100 text-slate-800'}`}>
+        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${style}`}>
             {status}
         </span>
     );
@@ -29,10 +40,19 @@ const StatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
 
 const StatusDropdown: React.FC<{
   project: FormData;
-  onUpdate: (id: string, status: ProjectStatus) => void;
+  onUpdate: (id: string, status: ProjectStatus | string) => void;
 }> = ({ project, onUpdate }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { state } = useAppContext();
+
+  const projectStatusOptions = useMemo(() => {
+    if (state.settings.projects.statuses && state.settings.projects.statuses.length > 0) {
+        return state.settings.projects.statuses.map(s => ({ value: s.label, label: s.label }));
+    }
+    return PROJECT_STATUS_OPTIONS;
+  }, [state.settings.projects.statuses]);
+
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -44,7 +64,7 @@ const StatusDropdown: React.FC<{
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleUpdate = (status: ProjectStatus) => {
+  const handleUpdate = (status: ProjectStatus | string) => {
     onUpdate(project.id, status);
     setIsOpen(false);
   };
@@ -61,7 +81,7 @@ const StatusDropdown: React.FC<{
       {isOpen && (
         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
           <div className="py-1">
-            {PROJECT_STATUS_OPTIONS.map(option => (
+            {projectStatusOptions.map(option => (
               <button
                 key={option.value}
                 onClick={() => handleUpdate(option.value)}

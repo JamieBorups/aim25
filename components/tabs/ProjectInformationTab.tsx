@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FormData, ProjectStatus } from '../../types';
 import FormField from '../ui/FormField';
 import { Input } from '../ui/Input';
@@ -19,6 +18,7 @@ import {
     ACTIVITY_TYPES,
     PROJECT_STATUS_OPTIONS,
 } from '../../constants';
+import { useAppContext } from '../../context/AppContext';
 
 interface Props {
   formData: FormData;
@@ -26,6 +26,14 @@ interface Props {
 }
 
 const ProjectInformationTab: React.FC<Props> = ({ formData, onChange }) => {
+  const { state: { settings } } = useAppContext();
+
+  const projectStatusOptions = useMemo(() => {
+      if (settings.projects.statuses && settings.projects.statuses.length > 0) {
+          return settings.projects.statuses.map(s => ({ value: s.label, label: s.label }));
+      }
+      return PROJECT_STATUS_OPTIONS;
+  }, [settings.projects.statuses]);
 
   const renderGenreField = (
       discipline: string,
@@ -64,7 +72,7 @@ const ProjectInformationTab: React.FC<Props> = ({ formData, onChange }) => {
       <FormField label="Project Status" htmlFor="status" required>
         <Select 
             id="status" 
-            options={PROJECT_STATUS_OPTIONS}
+            options={projectStatusOptions}
             value={formData.status} 
             onChange={e => onChange('status', e.target.value as ProjectStatus)} />
       </FormField>

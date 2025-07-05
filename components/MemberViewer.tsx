@@ -31,8 +31,8 @@ const ViewField: React.FC<{ label: string; value?: React.ReactNode; children?: R
     </div>
 );
 
-const TaskStatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
-    const statusMap: Record<TaskStatus, string> = {
+const TaskStatusBadge: React.FC<{ status: TaskStatus | string }> = ({ status }) => {
+    const statusMap: Record<string, string> = {
         'Backlog': "bg-slate-100 text-slate-800",
         'To Do': "bg-yellow-100 text-yellow-800",
         'In Progress': "bg-blue-100 text-blue-800",

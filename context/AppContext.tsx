@@ -1,10 +1,44 @@
-
 import React, { createContext, useReducer, useEffect, useContext, ReactNode, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { produce } from 'https://esm.sh/immer';
-import { AppState, Action, NotificationType, AppContextType } from '../types';
+import { AppState, Action, NotificationType, AppContextType, AppSettings, ProjectStatus } from '../types';
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const initialSettings: AppSettings = {
+  general: {
+    collectiveName: 'The Arts Incubator',
+    defaultCurrency: 'CAD',
+    dateFormat: 'YYYY-MM-DD',
+  },
+  projects: {
+    statuses: [],
+    disciplines: [],
+  },
+  members: {
+    roles: [],
+    availability: [],
+  },
+  tasks: {
+    statuses: [],
+    defaultWorkTypes: {
+      paidRate: 25,
+      inKindRate: 25,
+      volunteerRate: 0,
+    },
+    workWeek: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
+  },
+  budget: {
+    revenueLabels: {},
+    expenseLabels: {},
+  },
+  ai: {
+    enabled: false,
+    model: 'gemini-2.5-flash-preview-04-17',
+    quality: 'balanced',
+    systemInstruction: 'You are an assistant for a small, community-focused arts collective. Your tone should be encouraging, professional, and clear.',
+  },
+};
 
 const appReducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
@@ -78,10 +112,12 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return produce(state, draft => { draft.directExpenses.push(action.payload); });
     case 'SET_REPORTS':
       return produce(state, draft => { draft.reports = action.payload; });
+    case 'UPDATE_SETTINGS':
+      return produce(state, draft => { draft.settings = action.payload; });
     case 'SET_REPORT_PROJECT_ID_TO_OPEN':
       return produce(state, draft => { draft.reportProjectIdToOpen = action.payload; });
     case 'CLEAR_ALL_DATA':
-      return { ...initialState, reportProjectIdToOpen: null };
+      return { ...initialState };
     case 'LOAD_DATA':
         return { ...initialState, ...action.payload };
     default:
@@ -96,13 +132,32 @@ const initialState: AppState = {
   activities: [],
   directExpenses: [],
   reports: [],
+  settings: initialSettings,
   reportProjectIdToOpen: null,
 };
 
 const initializer = (): AppState => {
     try {
         const savedState = localStorage.getItem('appState');
-        return savedState ? JSON.parse(savedState) : initialState;
+        if (!savedState) return initialState;
+        
+        const parsed = JSON.parse(savedState);
+        
+        // Deep merge settings to handle state migrations safely
+        const existingSettings = parsed.settings || {};
+        parsed.settings = {
+            ...initialSettings,
+            ...existingSettings,
+            general: { ...initialSettings.general, ...existingSettings.general },
+            projects: { ...initialSettings.projects, ...existingSettings.projects },
+            members: { ...initialSettings.members, ...existingSettings.members },
+            tasks: { ...initialSettings.tasks, ...existingSettings.tasks },
+            budget: { ...initialSettings.budget, ...existingSettings.budget },
+            ai: { ...initialSettings.ai, ...existingSettings.ai },
+        };
+        
+        return { ...initialState, ...parsed };
+
     } catch (e) {
         console.error("Failed to parse state from localStorage", e);
         return initialState;
